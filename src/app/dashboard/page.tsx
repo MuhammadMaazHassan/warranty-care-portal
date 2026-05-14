@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import CountUp from "react-countup";
 import PortalLayout from "@/components/layout/PortalLayout";
@@ -9,6 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -24,27 +30,94 @@ import {
   Activity,
   CalendarDays,
   ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Mock data
-const mockKPIs = {
-  totalTickets: 147,
-  openTickets: 23,
-  escalatedTickets: 5,
-  resolvedThisWeek: 42,
-  autoResolutionRate: 68,
-  avgResolutionTime: "2.4 days",
-  tokenConsumption: 12450,
+// Types
+type Period = "7d" | "30d" | "90d";
+
+interface KPIs {
+  totalTickets: number;
+  openTickets: number;
+  escalatedTickets: number;
+  resolvedThisWeek: number;
+  autoResolutionRate: number;
+  avgResolutionTime: string;
+  tokenConsumption: number;
+  tokenLimit: number;
+}
+
+interface Ticket {
+  id: string;
+  homeowner: string;
+  address: string;
+  issueType: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+}
+
+// Mock data per period
+const mockData: Record<Period, { kpis: KPIs; tickets: Ticket[] }> = {
+  "7d": {
+    kpis: {
+      totalTickets: 147,
+      openTickets: 23,
+      escalatedTickets: 5,
+      resolvedThisWeek: 42,
+      autoResolutionRate: 68,
+      avgResolutionTime: "2.4 days",
+      tokenConsumption: 12450,
+      tokenLimit: 20000,
+    },
+    tickets: [
+      { id: "TKT-001", homeowner: "Sarah Johnson", address: "123 Maple St", issueType: "HVAC not cooling", status: "open", priority: "high", createdAt: "2026-05-10" },
+      { id: "TKT-002", homeowner: "Michael Chen", address: "456 Oak Ave", issueType: "Leaking faucet", status: "in_progress", priority: "medium", createdAt: "2026-05-09" },
+      { id: "TKT-003", homeowner: "Emily Davis", address: "789 Pine Rd", issueType: "Cabinet door loose", status: "resolved", priority: "low", createdAt: "2026-05-08" },
+      { id: "TKT-004", homeowner: "Robert Wilson", address: "321 Elm St", issueType: "Water intrusion", status: "escalated", priority: "urgent", createdAt: "2026-05-07" },
+      { id: "TKT-005", homeowner: "Jennifer Martinez", address: "654 Cedar Ln", issueType: "Electrical outlet not working", status: "open", priority: "high", createdAt: "2026-05-06" },
+    ],
+  },
+  "30d": {
+    kpis: {
+      totalTickets: 512,
+      openTickets: 67,
+      escalatedTickets: 18,
+      resolvedThisWeek: 156,
+      autoResolutionRate: 72,
+      avgResolutionTime: "2.1 days",
+      tokenConsumption: 48320,
+      tokenLimit: 20000,
+    },
+    tickets: [
+      { id: "TKT-101", homeowner: "James Wilson", address: "987 Pine St", issueType: "Water heater issue", status: "resolved", priority: "medium", createdAt: "2026-04-20" },
+      { id: "TKT-102", homeowner: "Linda Brown", address: "654 Oak Ave", issueType: "Roof leak", status: "in_progress", priority: "high", createdAt: "2026-04-15" },
+      { id: "TKT-103", homeowner: "Robert Johnson", address: "321 Elm St", issueType: "Garage door", status: "open", priority: "low", createdAt: "2026-04-10" },
+      { id: "TKT-104", homeowner: "Maria Garcia", address: "159 Maple Dr", issueType: "Electrical short", status: "escalated", priority: "urgent", createdAt: "2026-04-05" },
+      { id: "TKT-105", homeowner: "David Lee", address: "753 Cedar Ln", issueType: "Plumbing clog", status: "resolved", priority: "medium", createdAt: "2026-04-01" },
+    ],
+  },
+  "90d": {
+    kpis: {
+      totalTickets: 1247,
+      openTickets: 142,
+      escalatedTickets: 34,
+      resolvedThisWeek: 289,
+      autoResolutionRate: 65,
+      avgResolutionTime: "2.9 days",
+      tokenConsumption: 112450,
+      tokenLimit: 20000,
+    },
+    tickets: [
+      { id: "TKT-201", homeowner: "Thomas Anderson", address: "42 Wallaby Way", issueType: "Foundation crack", status: "escalated", priority: "urgent", createdAt: "2026-02-28" },
+      { id: "TKT-202", homeowner: "Sarah Connor", address: "742 Evergreen Terr", issueType: "HVAC fan broken", status: "resolved", priority: "high", createdAt: "2026-02-20" },
+      { id: "TKT-203", homeowner: "John Wick", address: "123 Continental Ave", issueType: "Flooring damage", status: "open", priority: "medium", createdAt: "2026-02-10" },
+      { id: "TKT-204", homeowner: "Ellen Ripley", address: "426 Nostromo Dr", issueType: "Mold growth", status: "in_progress", priority: "high", createdAt: "2026-02-01" },
+      { id: "TKT-205", homeowner: "Tony Stark", address: "10880 Malibu Point", issueType: "Smart home integration", status: "resolved", priority: "low", createdAt: "2026-01-25" },
+    ],
+  },
 };
-
-const mockRecentTickets = [
-  { id: "TKT-001", homeowner: "Sarah Johnson", address: "123 Maple St", issueType: "HVAC not cooling", status: "open", priority: "high", createdAt: "2026-05-10" },
-  { id: "TKT-002", homeowner: "Michael Chen", address: "456 Oak Ave", issueType: "Leaking faucet", status: "in_progress", priority: "medium", createdAt: "2026-05-09" },
-  { id: "TKT-003", homeowner: "Emily Davis", address: "789 Pine Rd", issueType: "Cabinet door loose", status: "resolved", priority: "low", createdAt: "2026-05-08" },
-  { id: "TKT-004", homeowner: "Robert Wilson", address: "321 Elm St", issueType: "Water intrusion", status: "escalated", priority: "urgent", createdAt: "2026-05-07" },
-  { id: "TKT-005", homeowner: "Jennifer Martinez", address: "654 Cedar Ln", issueType: "Electrical outlet not working", status: "open", priority: "high", createdAt: "2026-05-06" },
-];
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -79,7 +152,7 @@ const CircularProgress = ({ value = 0, max = 100, size = 50, strokeWidth = 5, co
   );
 };
 
-// Animation variants (fixed type issue by using simple object)
+// Animation variants
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
@@ -94,9 +167,33 @@ const staggerContainer = {
 };
 
 export default function DashboardPage() {
-  const [kpis] = useState(mockKPIs);
-  const [tickets] = useState(mockRecentTickets);
-  const [loading] = useState(false);
+  const [period, setPeriod] = useState<Period>("7d");
+  const [kpis, setKpis] = useState<KPIs>(mockData["7d"].kpis);
+  const [tickets, setTickets] = useState<Ticket[]>(mockData["7d"].tickets);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const handlePeriodChange = (newPeriod: Period) => {
+    if (newPeriod === period) return;
+    setLoading(true);
+    // Simulate API fetch
+    setTimeout(() => {
+      setPeriod(newPeriod);
+      setKpis(mockData[newPeriod].kpis);
+      setTickets(mockData[newPeriod].tickets);
+      setLoading(false);
+      setToast(`Showing data for ${newPeriod === "7d" ? "last 7 days" : newPeriod === "30d" ? "last 30 days" : "last 90 days"}`);
+      setTimeout(() => setToast(null), 3000);
+    }, 500);
+  };
+
+  const getPeriodLabel = (p: Period) => {
+    switch (p) {
+      case "7d": return "Last 7 days";
+      case "30d": return "Last 30 days";
+      case "90d": return "Last 90 days";
+    }
+  };
 
   return (
     <ProtectedRoute allowedRoles={["admin", "staff", "homeowner"]}>
@@ -105,19 +202,50 @@ export default function DashboardPage() {
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
-          className="space-y-6"
+          className="space-y-6 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto"
         >
+          {/* Toast notification */}
+          <AnimatePresence>
+            {toast && (
+              <motion.div
+                initial={{ opacity: 0, y: -50, x: "-50%" }}
+                animate={{ opacity: 1, y: 0, x: "-50%" }}
+                exit={{ opacity: 0, y: -50, x: "-50%" }}
+                className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200"
+              >
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="text-sm font-medium">{toast}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Header */}
           <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-primary dark:text-[#b48c3c]">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent dark:from-[#b48c3c] dark:to-[#d4af6c]">
                 Dashboard
               </h1>
               <p className="text-muted-foreground mt-1">Welcome back! Here's your warranty performance.</p>
             </div>
-            <Button className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              <CalendarDays className="mr-2 h-4 w-4" /> Last 7 days
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 w-full sm:w-auto gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  {getPeriodLabel(period)}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handlePeriodChange("7d")}>
+                  Last 7 days
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePeriodChange("30d")}>
+                  Last 30 days
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePeriodChange("90d")}>
+                  Last 90 days
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </motion.div>
 
           {/* KPI Cards Grid */}
@@ -138,8 +266,10 @@ export default function DashboardPage() {
                       <TicketCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold"><CountUp end={kpis.totalTickets} duration={1.5} separator="," /></div>
-                      <p className="text-xs text-muted-foreground mt-1">+{kpis.resolvedThisWeek} this week</p>
+                      <div className="text-2xl font-bold">
+                        <CountUp key={`total-${period}`} end={kpis.totalTickets} duration={1.5} separator="," />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">+{kpis.resolvedThisWeek} resolved this period</p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -150,7 +280,9 @@ export default function DashboardPage() {
                       <AlertCircle className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold"><CountUp end={kpis.openTickets} duration={1.5} /></div>
+                      <div className="text-2xl font-bold">
+                        <CountUp key={`open-${period}`} end={kpis.openTickets} duration={1.5} />
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">{kpis.escalatedTickets} escalated</p>
                     </CardContent>
                   </Card>
@@ -162,8 +294,10 @@ export default function DashboardPage() {
                       <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent className="flex items-center justify-between">
-                      <div className="text-2xl font-bold"><CountUp end={kpis.autoResolutionRate} duration={1.5} suffix="%" /></div>
-                      <CircularProgress value={kpis.autoResolutionRate} />
+                      <div className="text-2xl font-bold">
+                        <CountUp key={`rate-${period}`} end={kpis.autoResolutionRate} duration={1.5} suffix="%" />
+                      </div>
+                      <CircularProgress key={`progress-${period}`} value={kpis.autoResolutionRate} />
                     </CardContent>
                     <p className="text-xs text-muted-foreground px-6 pb-4">Target: 60% (Phase 1)</p>
                   </Card>
@@ -175,16 +309,21 @@ export default function DashboardPage() {
                       <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{kpis.avgResolutionTime}</div>
+                      <div className="text-2xl font-bold">
+                        <CountUp key={`time-${period}`} end={parseFloat(kpis.avgResolutionTime)} duration={1.5} decimals={1} suffix=" days" />
+                      </div>
                       <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
                         <motion.div
+                          key={`token-bar-${period}`}
                           className="h-full bg-secondary rounded-full"
                           initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(100, (kpis.tokenConsumption / 20000) * 100)}%` }}
+                          animate={{ width: `${Math.min(100, (kpis.tokenConsumption / kpis.tokenLimit) * 100)}%` }}
                           transition={{ duration: 1 }}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Tokens: {kpis.tokenConsumption.toLocaleString()} / 20k</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Tokens: {kpis.tokenConsumption.toLocaleString()} / {kpis.tokenLimit.toLocaleString()}
+                      </p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -197,7 +336,7 @@ export default function DashboardPage() {
             <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle>Recent Tickets</CardTitle>
-                <p className="text-sm text-muted-foreground">Latest warranty claims</p>
+                <p className="text-sm text-muted-foreground">Latest warranty claims for {getPeriodLabel(period)}</p>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table className="min-w-[800px] md:min-w-full">
