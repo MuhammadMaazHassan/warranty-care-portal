@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import PortalLayout from "@/components/layout/PortalLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,116 +15,472 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Trash2, Search } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  Upload,
+  FileText,
+  Trash2,
+  Search,
+  Loader2,
+  CheckCircle2,
+  X,
+  File,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const mockDocs = [
-  {
-    id: "1",
-    name: "HVAC Troubleshooting Guide.pdf",
-    size: "2.4 MB",
-    uploaded: "2026-05-10",
-    indexed: true,
+// Types
+interface Document {
+  id: string;
+  name: string;
+  size: string;
+  sizeBytes: number;
+  uploaded: string;
+  indexed: boolean;
+  indexing?: boolean;
+}
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05, delayChildren: 0.1 },
   },
-  {
-    id: "2",
-    name: "Plumbing Warranty Standards.pdf",
-    size: "1.1 MB",
-    uploaded: "2026-05-09",
-    indexed: true,
-  },
-  {
-    id: "3",
-    name: "Cabinet Adjustment Manual.pdf",
-    size: "0.8 MB",
-    uploaded: "2026-05-08",
-    indexed: false,
-  },
-];
+};
+
+const rowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 20, transition: { duration: 0.2 } },
+};
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const buttonVariants = {
+  tap: { scale: 0.97 },
+  hover: { scale: 1.02, transition: { duration: 0.2 } },
+};
+
+// Helper to format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+};
 
 export default function KnowledgeBasePage() {
+  const [documents, setDocuments] = useState<Document[]>([
+    {
+      id: "1",
+      name: "HVAC Troubleshooting Guide.pdf",
+      size: "2.4 MB",
+      sizeBytes: 2.4 * 1024 * 1024,
+      uploaded: "2026-05-10",
+      indexed: true,
+    },
+    {
+      id: "2",
+      name: "Plumbing Warranty Standards.pdf",
+      size: "1.1 MB",
+      sizeBytes: 1.1 * 1024 * 1024,
+      uploaded: "2026-05-09",
+      indexed: true,
+    },
+    {
+      id: "3",
+      name: "Cabinet Adjustment Manual.pdf",
+      size: "0.8 MB",
+      sizeBytes: 0.8 * 1024 * 1024,
+      uploaded: "2026-05-08",
+      indexed: false,
+    },
+  ]);
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [toastMessage, setToastMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = mockDocs.filter((d) =>
-    d.name.toLowerCase().includes(search.toLowerCase()),
+  // Filter documents based on search
+  const filteredDocuments = documents.filter((doc) =>
+    doc.name.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // Show toast notification
+  const showToast = (type: "success" | "error" | "info", text: string) => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Simulate file upload and indexing
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      showToast("error", "Only PDF and DOCX files are allowed");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("error", "File size must be less than 10MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    clearInterval(interval);
+    setUploadProgress(100);
+
+    // Create new document
+    const newDoc: Document = {
+      id: Date.now().toString(),
+      name: file.name,
+      size: formatFileSize(file.size),
+      sizeBytes: file.size,
+      uploaded: new Date().toISOString().split("T")[0],
+      indexed: false,
+      indexing: true,
+    };
+
+    setDocuments((prev) => [newDoc, ...prev]);
+    setUploading(false);
+    setUploadProgress(0);
+
+    // Simulate indexing process
+    setTimeout(() => {
+      setDocuments((prev) =>
+        prev.map((doc) =>
+          doc.id === newDoc.id
+            ? { ...doc, indexed: true, indexing: false }
+            : doc,
+        ),
+      );
+      showToast("success", `${file.name} has been indexed successfully`);
+    }, 3000);
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Delete document
+  const handleDeleteDocument = async (id: string, name: string) => {
+    // Optimistic delete
+    setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+    showToast("info", `${name} has been deleted`);
+
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  };
+
+  // Retry indexing for failed documents
+  const handleRetryIndexing = async (id: string) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (doc.id === id ? { ...doc, indexing: true } : doc)),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    setDocuments((prev) =>
+      prev.map((doc) =>
+        doc.id === id ? { ...doc, indexed: true, indexing: false } : doc,
+      ),
+    );
+    showToast("success", "Document indexed successfully");
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
     <ProtectedRoute allowedRoles={["admin", "staff"]}>
       <PortalLayout>
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -50, x: "-50%" }}
+              animate={{ opacity: 1, y: 0, x: "-50%" }}
+              exit={{ opacity: 0, y: -50, x: "-50%" }}
+              className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${
+                toastMessage.type === "success"
+                  ? "bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200"
+                  : toastMessage.type === "error"
+                    ? "bg-red-50 dark:bg-red-900/80 text-red-800 dark:text-red-200 border border-red-200"
+                    : "bg-blue-50 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200 border border-blue-200"
+              }`}
+            >
+              {toastMessage.type === "success" && (
+                <CheckCircle2 className="h-5 w-5" />
+              )}
+              {toastMessage.type === "error" && <X className="h-5 w-5" />}
+              {toastMessage.type === "info" && <FileText className="h-5 w-5" />}
+              <span className="text-sm font-medium">{toastMessage.text}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-          className="space-y-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto"
         >
-          <div className="flex justify-between items-center">
+          {/* Header */}
+          <motion.div
+            variants={fadeInUp}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+          >
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-primary dark:text-[#b48c3c] transition-colors duration-300">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent dark:from-[#b48c3c] dark:to-[#d4af6c]">
                 Knowledge Base
               </h1>
-              <p className="text-muted-foreground">
-                Upload documents to inform the agent
+              <p className="text-muted-foreground text-sm md:text-base mt-1">
+                Upload documents to inform the AI agent
               </p>
             </div>
-            <Button disabled={uploading}>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload PDF/DOCX
-            </Button>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search documents..."
-                  className="pl-8"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <div className="overflow-x-auto">
-                <Table className="min-w-[600px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell>{d.name}</TableCell>
-                      <TableCell>{d.size}</TableCell>
-                      <TableCell>{d.uploaded}</TableCell>
-                      <TableCell>
-                        {d.indexed ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            Indexed
-                          </Badge>
+            <motion.div
+              variants={buttonVariants}
+              whileTap="tap"
+              whileHover="hover"
+            >
+              <Button
+                onClick={triggerFileUpload}
+                disabled={uploading}
+                className="shadow-md hover:shadow-lg transition-shadow"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading... {uploadProgress}%
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload PDF/DOCX
+                  </>
+                )}
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </motion.div>
+          </motion.div>
+
+          {/* Documents Card */}
+          <motion.div variants={fadeInUp}>
+            <Card className="shadow-sm hover:shadow-md transition-shadow duration-300">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Search Bar */}
+                <div className="mb-6 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search documents by name..."
+                    className="pl-9 pr-4"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                {/* Table - Responsive */}
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table className="min-w-[640px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">Name</TableHead>
+                        <TableHead className="font-semibold">Size</TableHead>
+                        <TableHead className="font-semibold">
+                          Uploaded
+                        </TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="text-right font-semibold">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <AnimatePresence mode="popLayout">
+                        {filteredDocuments.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={5}
+                              className="text-center py-12 text-muted-foreground"
+                            >
+                              <File className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                              No documents found
+                              {search && (
+                                <Button
+                                  variant="link"
+                                  onClick={() => setSearch("")}
+                                  className="ml-2"
+                                >
+                                  Clear search
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
                         ) : (
-                          <Badge variant="outline">Pending</Badge>
+                          filteredDocuments.map((doc) => (
+                            <motion.tr
+                              key={doc.id}
+                              variants={rowVariants}
+                              initial="hidden"
+                              animate="visible"
+                              exit="exit"
+                              layout
+                              className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground" />
+                                  <span className="truncate max-w-[200px] md:max-w-none">
+                                    {doc.name}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {doc.size}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {doc.uploaded}
+                              </TableCell>
+                              <TableCell>
+                                {doc.indexing ? (
+                                  <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Indexing...
+                                  </Badge>
+                                ) : doc.indexed ? (
+                                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Indexed
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="gap-1">
+                                    <X className="h-3 w-3" />
+                                    Failed
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  {!doc.indexed && !doc.indexing && (
+                                    <motion.div
+                                      variants={buttonVariants}
+                                      whileTap="tap"
+                                      whileHover="hover"
+                                    >
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRetryIndexing(doc.id)
+                                        }
+                                        className="h-8 px-2 text-xs"
+                                      >
+                                        <Loader2 className="h-3 w-3 mr-1" />
+                                        Retry
+                                      </Button>
+                                    </motion.div>
+                                  )}
+                                  <motion.div
+                                    variants={buttonVariants}
+                                    whileTap="tap"
+                                    whileHover="hover"
+                                  >
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleDeleteDocument(doc.id, doc.name)
+                                      }
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 p-0"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </TableCell>
+                            </motion.tr>
+                          ))
                         )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                      </AnimatePresence>
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Document Count */}
+                <div className="mt-4 text-xs text-muted-foreground text-right">
+                  Total: {documents.length} documents (
+                  {documents.filter((d) => d.indexed).length} indexed)
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Help Card */}
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-l-4 border-l-secondary bg-gradient-to-r from-secondary/5 to-transparent dark:from-secondary/10">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-secondary" />
+                  Supported Formats
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Upload PDF or DOCX files up to 10MB. After upload, documents
+                  are automatically indexed and made available to the AI agent
+                  for retrieval.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
       </PortalLayout>
     </ProtectedRoute>
