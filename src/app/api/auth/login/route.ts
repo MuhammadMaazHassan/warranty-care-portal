@@ -15,7 +15,10 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { company: true },
+      include: { 
+        company: true,
+        properties: true
+      },
     });
 
     if (!user) {
@@ -42,14 +45,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // In a real app, we would generate a JWT here
-    // For now, we return the user data as requested
     const userData = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role.toLowerCase(),
+      companyId: user.companyId,
       companyName: user.company?.name || null,
+      properties: user.properties,
       online: true,
       lastSeen: new Date(),
     };

@@ -11,13 +11,24 @@ import { useRouter } from "next/navigation";
 
 export type UserRole = "admin" | "staff" | "homeowner";
 
+export interface Property {
+  id: string;
+  address: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  coeDate?: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   avatar?: string;
+  companyId?: string;
   companyName?: string;
+  properties?: Property[];
   online: boolean;
   lastSeen?: Date;
 }

@@ -47,6 +47,7 @@ import { Camera, Circle } from "lucide-react";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "staff", "homeowner"] },
+  { name: "AI Assistant", href: "/chat", icon: Bot, roles: ["admin", "staff", "homeowner"] },
   { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
   { name: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
   { name: "Agent Config", href: "/agent-config", icon: Bot, roles: ["admin"] },
@@ -123,11 +124,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     whileHover={{ x: 4 }}
                     transition={{ duration: 0.2 }}
                     className={`flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-all ${isActive
-                        ? "border-l-4 border-l-secondary bg-white/5 pl-2 text-white font-semibold"
-                        : "text-white/80 hover:bg-white/10 hover:text-white"
+                      ? "border-l-4 border-l-secondary bg-white/5 pl-2 text-white font-semibold"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                       }`}
                   >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <item.icon className="h-5 w-5 shrink-0" />
                     {sidebarExpanded && <span>{item.name}</span>}
                   </motion.div>
                 </Link>
@@ -228,8 +229,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     {filteredNav.map((item) => (
                       <Link key={item.name} href={item.href} onClick={closeMobileSidebar}>
                         <div className={`flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-all ${pathname === item.href
-                            ? "bg-white/10 text-white font-semibold"
-                            : "text-white/80 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/10 text-white font-semibold"
+                          : "text-white/80 hover:bg-white/10 hover:text-white"
                           }`}>
                           <item.icon className="h-5 w-5" />
                           <span>{item.name}</span>
