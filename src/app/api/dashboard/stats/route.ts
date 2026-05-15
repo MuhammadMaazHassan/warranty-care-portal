@@ -37,7 +37,7 @@ export async function GET() {
         id: t.id,
         homeowner: t.homeowner?.name || "Unknown",
         issue: t.issueType,
-        status: t.status.toLowerCase(),
+        status: t.status,
         date: t.createdAt
       }))
     };

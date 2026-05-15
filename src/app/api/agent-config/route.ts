@@ -3,11 +3,10 @@ import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const config = await prisma.agentConfig.findFirst({
-      where: { isActive: true },
+    const configs = await prisma.agentConfig.findMany({
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(config);
+    return NextResponse.json(configs);
   } catch (error) {
     return NextResponse.json({ message: "Error fetching config" }, { status: 500 });
   }
