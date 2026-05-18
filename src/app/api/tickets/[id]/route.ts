@@ -4,11 +4,12 @@ import { MailService } from "@/lib/mail-service";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const ticket = await prisma.ticket.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         homeowner: true,
         property: true,
@@ -34,15 +35,16 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const data = await request.json();
     const { status, priority } = data;
 
     // Get old ticket to check if status changed
     const oldTicket = await prisma.ticket.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { homeowner: true }
     });
 
@@ -51,7 +53,7 @@ export async function PATCH(
     }
 
     const ticket = await prisma.ticket.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: status || undefined,
         priority: priority || undefined,

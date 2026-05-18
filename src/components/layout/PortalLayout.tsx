@@ -22,6 +22,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Users,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -49,6 +52,7 @@ const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "staff", "homeowner"] },
   { name: "AI Assistant", href: "/chat", icon: Bot, roles: ["admin", "staff", "homeowner"] },
   { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
+  { name: "Team", href: "/dashboard/team", icon: Users, roles: ["admin"] },
   { name: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
   { name: "Agent Config", href: "/agent-config", icon: Bot, roles: ["admin"] },
   { name: "Knowledge Base", href: "/knowledge-base", icon: Database, roles: ["admin", "staff"] },
@@ -60,6 +64,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -258,11 +264,44 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="flex-1 p-4 md:p-6">{children}</div>
       </main>
 
-      {/* Profile Settings Dialog (unchanged) */}
-      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+      {/* Profile Settings Dialog */}
+      <Dialog open={profileOpen} onOpenChange={(open) => { setProfileOpen(open); if (!open) setIsEditingProfile(false); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Profile Settings</DialogTitle>
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle>Profile Settings</DialogTitle>
+              {!isEditingProfile ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-8"
+                  onClick={() => { setEditedName(user?.name || ""); setIsEditingProfile(true); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 h-8 text-muted-foreground"
+                    onClick={() => setIsEditingProfile(false)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5 h-8 bg-[#0F3B3D] hover:bg-[#0F3B3D]/90"
+                    onClick={() => { updateProfile({ name: editedName }); setIsEditingProfile(false); }}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex flex-col items-center gap-4">
@@ -283,22 +322,46 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {user?.online ? "Online" : "Offline"}
               </Badge>
             </div>
+
+            {/* Full Name */}
             <div>
               <Label>Full Name</Label>
-              <Input value={user?.name || ""} onChange={(e) => updateProfile({ name: e.target.value })} />
+              {isEditingProfile ? (
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="mt-1"
+                  autoFocus
+                />
+              ) : (
+                <Input value={user?.name || ""} disabled className="bg-muted mt-1" />
+              )}
             </div>
+
+            {/* Email — always locked */}
             <div>
-              <Label>Email</Label>
-              <Input value={user?.email || ""} disabled className="bg-muted" />
+              <Label className="flex items-center gap-1.5">
+                Email
+                <span className="text-[10px] font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Cannot be changed</span>
+              </Label>
+              <Input value={user?.email || ""} disabled className="bg-muted mt-1" />
             </div>
+
+            {/* Role */}
             <div>
               <Label>Role</Label>
-              <Input value={user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""} disabled className="bg-muted" />
+              <Input
+                value={user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""}
+                disabled
+                className="bg-muted mt-1"
+              />
             </div>
+
+            {/* Company */}
             {user?.companyName && (
               <div>
                 <Label>Company</Label>
-                <Input value={user.companyName} disabled className="bg-muted" />
+                <Input value={user.companyName} disabled className="bg-muted mt-1" />
               </div>
             )}
           </div>

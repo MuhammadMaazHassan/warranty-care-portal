@@ -80,4 +80,57 @@ export class MailService {
 
     return this.sendEmail({ to, subject, html });
   }
+
+  static async sendVerificationOtp(to: string, otp: string) {
+    const subject = `Your Verification Code is ${otp}`;
+    
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+        <div style="background: #0F3B3D; color: white; padding: 20px; text-align: center;">
+          <h1 style="margin: 0; font-size: 24px;">Verify Your Email</h1>
+        </div>
+        <div style="padding: 30px; line-height: 1.6; color: #333; text-align: center;">
+          <p>Hello,</p>
+          <p>Please use the following 6-digit code to complete your signup process:</p>
+          <div style="background: #f8f9fa; border: 2px dashed #b48c3c; padding: 15px; margin: 20px auto; max-width: 200px; font-size: 32px; font-weight: bold; letter-spacing: 5px;">
+            ${otp}
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>
+        <div style="background: #f4f4f4; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p>&copy; 2026 Ai.Lumen Warranty Care. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    return this.sendEmail({ to, subject, html });
+  }
+
+  static async sendPasswordResetOtp(to: string, otp: string) {
+    const subject = `Reset Your Password - Verification Code: ${otp}`;
+    
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+        <div style="background: #0F3B3D; color: white; padding: 20px; text-align: center;">
+          <h1 style="margin: 0; font-size: 24px;">Reset Your Password</h1>
+        </div>
+        <div style="padding: 30px; line-height: 1.6; color: #333; text-align: center;">
+          <p>Hello,</p>
+          <p>We received a request to reset your account password. Please use the following 6-digit verification code to proceed:</p>
+          <div style="background: #f8f9fa; border: 2px dashed #b48c3c; padding: 15px; margin: 20px auto; max-width: 200px; font-size: 32px; font-weight: bold; letter-spacing: 5px;">
+            ${otp}
+          </div>
+          <p>This code is valid for 10 minutes.</p>
+          <p>If you did not request a password reset, please ignore this email; your password will remain unchanged.</p>
+        </div>
+        <div style="background: #f4f4f4; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p>&copy; 2026 Ai.Lumen Warranty Care. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    return this.sendEmail({ to, subject, html });
+  }
 }
+

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AIService, ChatMessage } from "@/lib/ai-service";
 import prisma from "@/lib/prisma";
+import { calculateWarrantyYear } from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
@@ -47,8 +48,47 @@ export async function POST(request: Request) {
         ]
       });
 
-      // Include conversationId in response so client can keep using it
-      return NextResponse.json({ ...response, conversationId: conversation.id });
+      let newTicket = null;
+      if (response.createTicket) {
+        // Find property to calculate warranty year
+        const property = await prisma.property.findFirst({
+          where: { homeownerId }
+        });
+        
+        const warrantyYear = property ? calculateWarrantyYear(property.coeDate) : 1;
+
+        newTicket = await prisma.ticket.create({
+          data: {
+            issueType: response.issueSummary || "General Issue",
+            homeownerId,
+            propertyId: property?.id,
+            conversation: {
+              connect: { id: conversation.id }
+            },
+            status: response.isEmergency ? "ESCALATED" : "OPEN",
+            priority: response.isEmergency ? "URGENT" : "MEDIUM",
+            isEmergency: response.isEmergency || false,
+            warrantyYear,
+          }
+        });
+
+        // Add a system message notifying user
+        await prisma.chatMessage.create({
+          data: {
+            conversationId: conversation.id,
+            role: "system",
+            content: `Ticket #${newTicket.id} has been automatically generated for this issue.`
+          }
+        });
+      }
+
+      // Include conversationId and ticket info in response
+      return NextResponse.json({ 
+        ...response, 
+        conversationId: conversation.id,
+        ticketCreated: !!newTicket,
+        ticketId: newTicket?.id
+      });
     }
 
     return NextResponse.json(response);
