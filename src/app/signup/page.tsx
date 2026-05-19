@@ -44,6 +44,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [otp, setOtp] = useState("");
+  const [correctOtp, setCorrectOtp] = useState("");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -88,6 +89,8 @@ export default function SignupPage() {
       });
       const data = await response.json();
       if (!response.ok) { setError(data.message || "Failed to send OTP"); return; }
+      
+      setCorrectOtp(data.otp);
       setSuccess("Verification code sent to your email!");
       setStep(2);
     } catch {
@@ -104,19 +107,31 @@ export default function SignupPage() {
 
     if (!otp || otp.length !== 6) { setError("Please enter a valid 6-digit code"); return; }
 
+    // Pure client-side OTP state verification (Option 1)
+    if (otp !== correctOtp) {
+      setError("Invalid verification code. Please try again.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/signup/verify", {
+      // Once OTP is verified, directly register the homeowner
+      const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, otp }),
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+        }),
       });
       const data = await response.json();
-      if (!response.ok) { setError(data.message || "Verification failed"); return; }
+      if (!response.ok) { setError(data.message || "Failed to create account"); return; }
+      
       setSuccess("Account created successfully! Redirecting to login...");
       setTimeout(() => router.push("/login?signup=success"), 2000);
     } catch {
-      setError("An unexpected error occurred during verification.");
+      setError("An unexpected error occurred during account creation.");
     } finally {
       setIsLoading(false);
     }
