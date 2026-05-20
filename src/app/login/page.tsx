@@ -678,8 +678,12 @@ function AuthContainer() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <LoginForm />
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#f2ede4] dark:bg-zinc-950 p-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#c59b4c] border-t-transparent" />
+      </div>
+    }>
+      <AuthContainer />
     </Suspense>
   );
 }
