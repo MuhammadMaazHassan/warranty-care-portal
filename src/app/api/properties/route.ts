@@ -9,7 +9,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    if (session.role === "homeowner") {
+    if (session.role === "HOMEOWNER") {
       // Homeowners can only fetch their own properties
       const properties = await prisma.property.findMany({
         where: { homeownerId: session.id },
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(request);
-    if (!session || (session.role !== "admin" && session.role !== "staff")) {
+    if (!session || (session.role !== "ADMIN" && session.role !== "STAFF")) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 

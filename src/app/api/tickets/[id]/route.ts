@@ -96,12 +96,20 @@ export async function PATCH(
     // If status changed, send email
     if (status && status !== oldTicket.status) {
       if (oldTicket.homeowner?.email) {
-        await MailService.sendTicketStatusUpdate(
-          oldTicket.homeowner.email,
-          oldTicket.homeowner.name || "Homeowner",
-          ticket.id,
-          status
-        );
+        try {
+          const mailResult = await MailService.sendTicketStatusUpdate(
+            oldTicket.homeowner.email,
+            oldTicket.homeowner.name || "Homeowner",
+            ticket.id,
+            status
+          );
+          
+          if (!mailResult.success) {
+            console.error("[Ticket API] Mail failed to send but ticket updated:", mailResult.error);
+          }
+        } catch (mailError) {
+          console.error("[Ticket API] Unexpected error sending status email:", mailError);
+        }
       }
     }
 

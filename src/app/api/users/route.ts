@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/session";
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(request);
-    if (!session || (session.role !== "admin" && session.role !== "staff")) {
+    if (!session || (session.role !== "ADMIN" && session.role !== "STAFF")) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 

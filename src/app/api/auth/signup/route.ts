@@ -34,6 +34,11 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Fetch the active/latest company to link with the public signup
+    const latestCompany = await prisma.company.findFirst({
+      orderBy: { createdAt: "desc" }
+    });
+
     // Public signup ALWAYS creates a HOMEOWNER
     const newUser = await prisma.user.create({
       data: {
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
         password: hashedPassword,
         name: fullName,
         role: "HOMEOWNER",
+        companyId: latestCompany?.id || null,
       },
     });
 
