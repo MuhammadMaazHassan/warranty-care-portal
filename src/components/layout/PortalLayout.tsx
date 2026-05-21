@@ -192,8 +192,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       {/* Main content area - margin-left adjusts based on sidebar state */}
       <main
-        className="flex-1 flex flex-col transition-all duration-200 ease-in-out overflow-auto"
-        style={{ marginLeft: typeof window !== "undefined" && window.innerWidth >= 768 ? sidebarWidth : 0 }}
+        className={`flex-1 flex flex-col transition-all duration-200 ease-in-out overflow-auto ${
+          sidebarExpanded ? "md:ml-64" : "md:ml-20"
+        }`}
       >
         {/* Mobile header (visible only on < md) */}
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-background px-4 shadow-sm md:hidden">
