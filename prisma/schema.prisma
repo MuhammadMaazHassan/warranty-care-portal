@@ -87,6 +87,7 @@ model Property {
 model Ticket {
   id            String         @id @default(cuid())
   issueType     String
+  description   String?        @db.Text
   status        TicketStatus   @default(OPEN)
   priority      TicketPriority @default(MEDIUM)
   isEmergency   Boolean        @default(false)
@@ -94,6 +95,8 @@ model Ticket {
   erpSyncStatus String?        @default("PENDING")
   erpReferenceId String?
   draftResponse String?        @db.Text
+  chatSummary   String?        @db.Text
+  extractedInfo String?        @db.Text
   homeownerId   String
   homeowner     User           @relation("HomeownerTickets", fields: [homeownerId], references: [id])
   propertyId    String?

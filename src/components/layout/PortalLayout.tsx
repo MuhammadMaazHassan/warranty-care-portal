@@ -55,7 +55,6 @@ const navItems = [
   { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
   { name: "Team", href: "/dashboard/team", icon: Users, roles: ["admin"] },
   { name: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
-  { name: "Agent Config", href: "/agent-config", icon: Bot, roles: ["admin"] },
   { name: "Knowledge Base", href: "/knowledge-base", icon: Database, roles: ["admin", "staff"] },
   { name: "Company", href: "/company", icon: Building2, roles: ["admin"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "staff"] },

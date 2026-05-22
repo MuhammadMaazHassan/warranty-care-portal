@@ -29,6 +29,7 @@ import {
   Sparkles,
   ThumbsUp,
   Trash2,
+  Bot,
 } from "lucide-react";
 
 export default function TicketDetail() {
@@ -276,6 +277,77 @@ export default function TicketDetail() {
                   </p>
                 </CardContent>
               </Card>
+
+              {ticket.chatSummary && (
+                <Card className="border-amber-500/20 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
+                  <div className="bg-gradient-to-r from-amber-600/10 to-orange-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
+                    <div className="p-1.5 bg-amber-500/20 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-bold tracking-tight">Botpress Conversation Summary</CardTitle>
+                      <p className="text-[10px] text-amber-300/80 font-medium">Automatically compiled handoff context</p>
+                    </div>
+                  </div>
+                  <CardContent className="p-6">
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                      {ticket.chatSummary}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {ticket.extractedInfo && (() => {
+                let parsedInfo: Record<string, any> | null = null;
+                try {
+                  const parsed = JSON.parse(ticket.extractedInfo);
+                  if (parsed && typeof parsed === "object") {
+                    parsedInfo = parsed;
+                  }
+                } catch (e) {
+                  // Fallback to null (plain text)
+                }
+
+                return (
+                  <Card className="border-indigo-500/20 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
+                    <div className="bg-gradient-to-r from-indigo-600/10 to-blue-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
+                      <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                        <Bot className="h-5 w-5 text-indigo-400" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-sm font-bold tracking-tight">Extracted Diagnostic Info</CardTitle>
+                        <p className="text-[10px] text-indigo-300/80 font-medium">Variables extracted by Botpress AI</p>
+                      </div>
+                    </div>
+                    <CardContent className="p-6">
+                      {parsedInfo ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {Object.entries(parsedInfo).map(([key, value]) => {
+                            // Beautify key from camelCase or snake_case
+                            const formattedKey = key
+                              .replace(/([A-Z])/g, " $1")
+                              .replace(/[_-]/g, " ")
+                              .replace(/^\w/, (c) => c.toUpperCase());
+                            
+                            const displayValue = typeof value === "object" ? JSON.stringify(value) : String(value);
+
+                            return (
+                              <div key={key} className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/40">
+                                <p className="text-xs text-slate-400 font-semibold tracking-wide uppercase">{formattedKey}</p>
+                                <p className="text-sm text-slate-200 mt-1 font-medium">{displayValue}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                          {ticket.extractedInfo}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex gap-2">

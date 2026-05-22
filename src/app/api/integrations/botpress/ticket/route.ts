@@ -63,6 +63,11 @@ export async function POST(request: Request) {
     const ticket = await prisma.ticket.create({
       data: {
         issueType,
+        description,
+        chatSummary: data.chatSummary || data.summary || null,
+        extractedInfo: data.extractedInfo 
+          ? (typeof data.extractedInfo === "object" ? JSON.stringify(data.extractedInfo) : String(data.extractedInfo))
+          : (data.specificInfo ? (typeof data.specificInfo === "object" ? JSON.stringify(data.specificInfo) : String(data.specificInfo)) : null),
         propertyId: selectedPropertyId || null,
         homeownerId: homeowner.id,
         isEmergency,

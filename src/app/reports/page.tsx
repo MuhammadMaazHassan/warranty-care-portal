@@ -493,9 +493,8 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Coming soon: per‑agent token cost, survey‑readiness scoring,
-                  custom date ranges, real‑time dashboards, and predictive
-                  analytics.
+                  Coming soon: survey‑readiness scoring, custom date ranges,
+                  real‑time dashboards, and predictive analytics.
                 </p>
               </CardContent>
             </Card>

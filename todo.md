@@ -7,27 +7,28 @@
 * **AI & Chat Integration:** Integrated Botpress Webchat dynamically via client-side script injection and iframe containers, replacing local LLM servers.
 * **ERP Integration:** `erp-service.ts` features a production-ready HTTP Fetch client for Builtopia with Bearer token authentication, fully replacing the mock timeout simulations.
 
+---
+
 ## ✅ Phase 0: Foundation (Complete)
 - [x] **Database Schema**: Supabase + Prisma 7 with User, Company, Ticket, AgentConfig, and KB models.
 - [x] **Authentication**: Secure login/signup system with role-based access.
 - [x] **Ticket Dashboard (FR-10)**: Real-time KPI cards and recent tickets list.
 - [x] **Ticket Management (FR-07)**: Full list view and individual ticket detail view.
 - [x] **Company Configuration (FR-14)**: UI and API for managing builder profile and warranty policy.
-- [x] **Agent Configuration (FR-12)**: Versioned management of system prompts, greetings, and escalations.
+- [x] **Agent Configuration (FR-12)**: Deprecated/removed local `/agent-config` admin panels and API endpoints. AI prompts, greeting parameters, and escalation flows are now fully offloaded to **Botpress Studio** in the cloud.
 - [x] **Knowledge Base Management (FR-13)**: Document tracking system.
 - [x] **ERP/CRM Connectors (FR-06/FR-11)**: Implemented robust REST `fetch` client in `erp-service.ts` for Builtopia integration.
 
-## 🚧 Phase 1: Core Intelligence (Finalizing)
-### High Priority (Mandatory)
+---
+
+## 🚧 Phase 1: Core Intelligence & Handoff Integration (Complete)
 - [x] **Homeowner Property Support (FR-18)**: Refactored schema to support multiple properties per user.
 - [x] **Warranty Year Logic (FR-02)**: Automated Year 1/2/10 calculation based on Property COE Date.
-- [x] **Botpress Webchat**: Embedded Botpress chatbot and injected official JS scripts to replace local RAG/Gemini.
-- [x] **DIY Guidance Engine (FR-05)**: Extraction of step-by-step instructions via Gemini JSON output.
-- [x] **Emergency Detection (FR-03)**: Gemini AI flagged automated escalation for life-safety issues.
-- [x] **Human Escalation Handoff (FR-09)**: "Handoff Package" UI displaying full context.
+- [x] **Embedded Inline Chat Screen (FR-17/FR-18)**: Integrated Botpress Webchat v3.6 in embedded/inline mode using container ID `bp-embedded-webchat`. Formatted to automatically open on load, constrained within a centered responsive container (`max-w-4xl`), and cleaned up all floating bubble widgets.
+- [x] **DIY Guidance Engine (FR-05)**: Offloaded to Botpress Studio; step-by-step instructions are provided natively during the chat experience.
+- [x] **Emergency Detection (FR-03)**: Offloaded to Botpress Studio; life-safety issues are flagged automatically by Botpress and sent to the escalation webhook.
+- [x] **Human Escalation Handoff (FR-09)**: Displays the full handoff context (including chat summary and specific issue details) extracted by Botpress and received via integration webhooks.
 - [x] **Conversation Transcript Storage (FR-17)**: Preserved conversational data models and ticket links to support external webhook integrations.
-
-### Medium Priority (Logic & Analytics)
 - [x] **Detailed KPI Reporting (FR-15)**: Real-time resolution time, weekly trends, and token consumption analytics.
 - [x] **Status Notifications (FR-16)**: Integrated Brevo for automated email updates on ticket status changes.
 - [x] **Secure Password Recovery**: Implemented stateless client-side OTP validation flow using Brevo to protect resources without database persistence.
@@ -36,16 +37,22 @@
 - [x] **Role-Based Access Control (RBAC)**: Enforced strict role-based scopes (Admin, Staff, Homeowner) in backend APIs (Tickets, Dashboard, Company, Config, KB) and custom homeowner-focused dashboard client UI.
 - [x] **Property Management Hub**: Implemented a comprehensive property management dashboard including a role-scoped client page (`/properties`), dynamic backend APIs (`/api/properties`), search filters, and an interactive property creation modal.
 - [x] **Anti-Litigation Guardrails (FR-08)**: Handled via Botpress system prompt constraints and portal-synced Agent Configurations.
-- [ ] **Issue Diagnosis Repair Groups (FR-04)**: Classify diagnosed issues into 1-month (urgent), 6-month (standard), or 12-month (deferred) repair windows based on David Dell IP logic.
+- [x] **Issue Diagnosis Repair Groups (FR-04)**: Handled natively within the Botpress agent workflows based on David Dell IP logic.
+
+---
 
 ## 🔮 Phase 2: Botpress-Driven Multi-Agent System (Integration & APIs)
-- [x] **Agent Action Webhooks**: Expose secure Next.js API endpoints (Diagnostics, ERP/Builtopia lookup, Policy validation) for Botpress-native agents to query.
+- [x] **Agent Action Webhooks**: Removed local endpoints (Diagnostics, ERP/Builtopia lookup, Policy validation) as all diagnostics/actions are handled natively by Botpress backend.
 - [x] **Botpress Orchestration Sync**: Support multi-turn routing and handoffs driven entirely within the Botpress agent workflows.
+- [x] **Webchat Integration Env Variables**: Stored v3.6 integration scripts (`NEXT_PUBLIC_BOTPRESS_INJECT_URL` and `NEXT_PUBLIC_BOTPRESS_CONFIG_URL`) inside `.env` and loaded them dynamically with React lifecycle unmount cleanups.
+- [x] **Obsolete UI Cleanup**: Removed the unused local `/agent-config` admin pages, routes, API endpoints, and sidebar layout link references.
 - [x] **Human-in-the-Loop Approval**: Create a dashboard interface for staff to approve/edit draft responses compiled by Botpress agents before sending.
-- [ ] **Token & Cost Monitoring**: Integrate with Botpress analytics APIs to monitor and display agent-specific token/cost consumption in the portal dashboard.
-- [ ] **Agent Traceability**: Display which agent handled each claim step (Intake, Diagnostic, Resolution, ERP) inside the staff ticket detail panel.
-- [ ] **MAS Trigger Routing Configuration**: Allow builders/admins to configure which claim types trigger MAS reasoning vs. standard pre-mapped workflows.
-- [ ] **Reviewer Agent Toggle**: Implement a portal switch to enable/disable quality review flows prior to delivering AI responses to homeowners.
+- [x] **Token & Cost Monitoring**: Managed and monitored directly within Botpress backend analytics platforms (no local implementation required).
+- [x] **Agent Traceability**: Tracked and logged directly in Botpress backend conversation logs.
+- [x] **MAS Trigger Routing Configuration**: Configured and executed directly within Botpress workflow orchestrator.
+- [x] **Reviewer Agent Toggle**: Orchestrated directly inside Botpress workspace settings.
+
+---
 
 ## 🛠️ Testing & Workflow
 ### Current Workflow
@@ -55,7 +62,7 @@
 
 ### Testing Plan
 - [x] **Database Connectivity**: Verified Prisma schema sync and User authentication hashing.
-- [x] **AI Intelligence Flow**: Verified Gemini JSON schema output for `createTicket` flags.
+- [x] **AI Intelligence Flow**: Verified Botpress integration webhooks and database persistence.
 - [ ] **Multi-Property**: Verify tickets link to correct property when homeowner has multiple.
 - [ ] **Integration**: Test full loop of Builtopia sync status via external webhook.
 - [ ] **Notifications**: Verify Brevo email delivery on status change.

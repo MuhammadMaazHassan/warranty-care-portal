@@ -8,7 +8,6 @@ const routeAccess: Record<string, string[]> = {
   "/tickets": ["admin", "staff", "homeowner"],
   "/tickets/": ["admin", "staff", "homeowner"],
   "/integrations": ["admin"],
-  "/agent-config": ["admin"],
   "/knowledge-base": ["admin", "staff"],
   "/company": ["admin"],
   "/reports": ["admin", "staff"],

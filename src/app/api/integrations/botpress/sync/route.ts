@@ -36,7 +36,12 @@ export async function POST(request: Request) {
       priority, 
       isEmergency, 
       messages = [],
-      draftResponse
+      draftResponse,
+      description,
+      chatSummary,
+      summary,
+      extractedInfo,
+      specificInfo
     } = body;
 
     if (!ticketId && !conversationId) {
@@ -99,6 +104,17 @@ export async function POST(request: Request) {
     }
     if (draftResponse !== undefined) {
       updatedData.draftResponse = draftResponse;
+    }
+    if (description !== undefined) {
+      updatedData.description = description;
+    }
+    const finalSummary = chatSummary || summary;
+    if (finalSummary !== undefined) {
+      updatedData.chatSummary = finalSummary;
+    }
+    const finalExtracted = extractedInfo || specificInfo;
+    if (finalExtracted !== undefined) {
+      updatedData.extractedInfo = typeof finalExtracted === "object" ? JSON.stringify(finalExtracted) : String(finalExtracted);
     }
 
     if (Object.keys(updatedData).length > 0) {
