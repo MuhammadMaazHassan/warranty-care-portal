@@ -54,6 +54,7 @@ const navItems = [
   { name: "Properties", href: "/properties", icon: Building2, roles: ["admin", "staff", "homeowner"] },
   { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
   { name: "Team", href: "/dashboard/team", icon: Users, roles: ["admin"] },
+  { name: "Homeowners", href: "/dashboard/homeowners", icon: User, roles: ["admin", "staff"] },
   { name: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
   { name: "Knowledge Base", href: "/knowledge-base", icon: Database, roles: ["admin", "staff"] },
   { name: "Company", href: "/company", icon: Building2, roles: ["admin"] },
@@ -108,10 +109,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           {/* Header with logo and toggle */}
           <div className="flex h-16 items-center justify-between px-4">
             <button onClick={() => router.push("/dashboard")} className="flex items-center gap-2 hover:opacity-80 transition">
-              {sidebarExpanded ? (
-                <span className="text-xl font-bold tracking-tight">Ai.Lumen Care</span>
-              ) : (
-                <span className="text-xl font-bold">AL</span>
+              <img src="/logo.png" alt="Logo" className="h-8 w-auto rounded-md" />
+              {sidebarExpanded && (
+                <span className="text-xl font-bold tracking-tight">{user?.companyName || "Ai.Lumen Care"}</span>
               )}
             </button>
             <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-white hover:bg-white/10">
@@ -200,7 +200,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <Button variant="ghost" size="icon" onClick={() => setMobileSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-bold">Ai.Lumen Care</span>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="Logo" className="h-6 w-auto rounded-sm" />
+            <span className="font-bold">{user?.companyName || "Ai.Lumen Care"}</span>
+          </div>
           <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -226,7 +229,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               >
                 <div className="flex h-full flex-col">
                   <div className="flex h-16 items-center justify-between px-4">
-                    <span className="text-xl font-bold">Ai.Lumen Care</span>
+                    <div className="flex items-center gap-2">
+                      <img src="/logo.png" alt="Logo" className="h-8 w-auto rounded-md" />
+                      <span className="text-xl font-bold">{user?.companyName || "Ai.Lumen Care"}</span>
+                    </div>
                     <Button variant="ghost" size="icon" onClick={closeMobileSidebar} className="text-white hover:bg-white/10">
                       <X className="h-5 w-5" />
                     </Button>

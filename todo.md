@@ -92,7 +92,7 @@
   - Add a new Property field: “Area of Home”. Explore Buildertrend or similar CRMs for reference when designing property and ticket fields.
   - Add a new Ticket field: “Type of Ticket” (e.g., Plumbing, Electrical, HVAC, etc.).
 
-- [ ] **Dashboard Branding & Homeowners Module**
+- [x] **Dashboard Branding & Homeowners Module**
   - Use the company logo as the bot logo as well as in the dashboard header.
   - Display the company name in the dashboard header alongside the logo.
   - Create a new CRUD module for Homeowners in the admin dashboard.
@@ -105,5 +105,5 @@
     - Create support tickets.
     - Access homeowners and property data to verify whether a warranty claim is genuine.
 
-- [ ] **Client Demo Preparation**
+- [x] **Client Demo Preparation**
   - Prepare the dashboard for the client demo by populating it with realistic mock data (seed script).
