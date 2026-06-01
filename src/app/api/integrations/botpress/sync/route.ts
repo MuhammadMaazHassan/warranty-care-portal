@@ -31,11 +31,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { 
       ticketId, 
-      conversationId, 
       status, 
       priority, 
       isEmergency, 
-      messages = [],
       draftResponse,
       description,
       chatSummary,
@@ -44,54 +42,24 @@ export async function POST(request: Request) {
       specificInfo
     } = body;
 
-    if (!ticketId && !conversationId) {
+    if (!ticketId) {
       return NextResponse.json({ 
-        message: "Either ticketId or conversationId must be specified to perform sync operations" 
+        message: "ticketId is required to perform sync operations" 
       }, { status: 400 });
     }
 
-    // 2. Resolve Ticket & Conversation records
-    let conversation = null;
-    let ticket = null;
+    // 2. Resolve Ticket
+    let ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
 
-    if (conversationId) {
-      conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
-        include: { ticket: true }
-      });
-      if (conversation) {
-        ticket = conversation.ticket;
-      }
-    }
-
-    if (!ticket && ticketId) {
-      ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId },
-        include: { conversation: true }
-      });
-      if (ticket) {
-        conversation = ticket.conversation;
-      }
-    }
-
-    // Ensure we have a conversation linked
     if (!ticket) {
       return NextResponse.json({ 
-        message: `Ticket record could not be resolved from inputs. Verify ticketId (${ticketId}) or conversationId (${conversationId})` 
+        message: `Ticket not found: ${ticketId}` 
       }, { status: 404 });
     }
 
-    // If a conversation doesn't exist yet for this ticket, let's create one on the fly!
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          ticketId: ticket.id,
-          homeownerId: ticket.homeownerId
-        }
-      });
-    }
-
-    // 3. Update Ticket Flags if specified
+    // 3. Update Ticket fields if specified
     const updatedData: any = {};
     if (status) updatedData.status = status;
     if (priority) updatedData.priority = priority;
@@ -123,7 +91,7 @@ export async function POST(request: Request) {
         data: updatedData
       });
 
-      // If synced to ERP or needed, trigger ERP synchronization to keep platforms unified
+      // Trigger ERP synchronization if resolved
       if (ticket.erpSyncStatus === "SYNCED" || status === "RESOLVED") {
         try {
           await syncTicketToERP(ticket.id);
@@ -133,30 +101,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Save message transcripts
-    let syncedMessagesCount = 0;
-    if (messages && Array.isArray(messages) && messages.length > 0) {
-      const chatMessagesData = messages.map((msg: any) => ({
-        conversationId: conversation.id,
-        role: msg.role === "assistant" || msg.role === "bot" ? "assistant" : "user",
-        content: msg.content || msg.text || "",
-        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-      }));
-
-      await prisma.chatMessage.createMany({
-        data: chatMessagesData
-      });
-      syncedMessagesCount = chatMessagesData.length;
-    }
-
     return NextResponse.json({
       success: true,
       ticketId: ticket.id,
-      conversationId: conversation.id,
       ticketStatus: ticket.status,
       ticketPriority: ticket.priority,
       isEmergency: ticket.isEmergency,
-      syncedMessagesCount
     });
 
   } catch (error: any) {

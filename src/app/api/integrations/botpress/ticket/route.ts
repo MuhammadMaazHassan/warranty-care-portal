@@ -13,7 +13,6 @@ export async function POST(request: Request) {
       description, 
       isEmergency = false, 
       priority, 
-      messages = [],
       kbReferences = []
     } = data;
 
@@ -42,7 +41,6 @@ export async function POST(request: Request) {
     let warrantyYear = 1;
 
     if (!selectedPropertyId && homeowner.properties.length > 0) {
-      // Default to homeowner's first property if not specified
       selectedPropertyId = homeowner.properties[0].id;
     }
 
@@ -82,43 +80,11 @@ export async function POST(request: Request) {
       }
     });
 
-    // 5. Create linked conversation transcript
-    const conversation = await prisma.conversation.create({
-      data: {
-        ticketId: ticket.id,
-        homeownerId: homeowner.id,
-      }
-    });
-
-    // 6. Save message transcripts if provided
-    if (messages && Array.isArray(messages) && messages.length > 0) {
-      // Add initial description message as a system note or user message if not already present
-      const chatMessagesData = messages.map((msg: any) => ({
-        conversationId: conversation.id,
-        role: msg.role === "assistant" || msg.role === "bot" ? "assistant" : "user",
-        content: msg.content || msg.text || "",
-        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-      }));
-
-      await prisma.chatMessage.createMany({
-        data: chatMessagesData
-      });
-    } else {
-      // Fallback: create a single chat message containing the ticket description
-      await prisma.chatMessage.create({
-        data: {
-          conversationId: conversation.id,
-          role: "user",
-          content: description
-        }
-      });
-    }
-
     console.log(`[BOTPRESS INTEGRATION] Ticket #${ticket.id} generated successfully for ${email}`);
 
     return NextResponse.json({
       success: true,
-      message: "Ticket and conversation transcript generated successfully",
+      message: "Ticket created successfully",
       ticketId: ticket.id,
       warrantyYear
     });

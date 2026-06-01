@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { issueType, ticketType, propertyId, priority, isEmergency, conversationId } = data;
+    const { issueType, ticketType, propertyId, priority, isEmergency } = data;
     let { homeownerId } = data;
 
     // Enforce homeownerId for homeowners
@@ -108,9 +108,6 @@ export async function POST(request: Request) {
         isEmergency: !!isEmergency,
         warrantyYear,
         status: isEmergency ? "ESCALATED" : "OPEN",
-        conversation: conversationId ? {
-          connect: { id: conversationId }
-        } : undefined
       },
     });
 

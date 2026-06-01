@@ -147,15 +147,13 @@ export default function KnowledgeBasePage() {
     setUploadProgress(40);
 
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("communityId", selectedCommunityId);
+
       const response = await fetch("/api/knowledge-base", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          size: formatFileSize(file.size),
-          url: "https://example.com/mock-url.pdf",
-          communityId: selectedCommunityId
-        }),
+        body: formData,
       });
 
       if (response.ok) {

@@ -36,7 +36,6 @@ model User {
   company         Company?  @relation(fields: [companyId], references: [id])
   properties      Property[]
   tickets         Ticket[]  @relation("HomeownerTickets")
-  conversations   Conversation[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
@@ -50,7 +49,6 @@ model Company {
   address         String?
   warrantyPolicy  String?              @db.Text
   users           User[]
-  agentConfigs    AgentConfig[]
   knowledgeBase   KnowledgeBaseDocument[]
   integrations    Integration[]
   communities     Community[]
@@ -105,43 +103,10 @@ model Ticket {
   homeowner     User           @relation("HomeownerTickets", fields: [homeownerId], references: [id])
   propertyId    String?
   property      Property?      @relation(fields: [propertyId], references: [id])
-  conversation  Conversation?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
 
-model Conversation {
-  id            String        @id @default(cuid())
-  ticketId      String?       @unique
-  ticket        Ticket?       @relation(fields: [ticketId], references: [id])
-  homeownerId   String
-  homeowner     User          @relation(fields: [homeownerId], references: [id])
-  messages      ChatMessage[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-}
-
-model ChatMessage {
-  id             String       @id @default(cuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  role           String       // "user", "assistant", "system"
-  content        String       @db.Text
-  timestamp      DateTime     @default(now())
-}
-
-model AgentConfig {
-  id                String   @id @default(cuid())
-  companyId         String
-  company           Company  @relation(fields: [companyId], references: [id])
-  systemPrompt      String   @db.Text
-  greetingMessage   String   @db.Text
-  escalationMessage String   @db.Text
-  isActive          Boolean  @default(true)
-  version           String   @default("1.0.0")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
 
 enum DocumentType {
   MANUAL

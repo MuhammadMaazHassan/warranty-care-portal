@@ -162,9 +162,11 @@ export default function HomeownersManagementPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Home className="h-8 w-8 text-[#0F3B3D]" />
-              Homeowners Management
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Home className="h-8 w-8 text-[#0F3B3D] dark:text-[#b48c3c]" />
+              <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent dark:from-[#b48c3c] dark:to-[#d4af6c]">
+                Homeowners Management
+              </span>
             </h1>
             <p className="text-muted-foreground mt-1">
               Manage homeowners. You can create or remove homeowner accounts.
@@ -293,16 +295,16 @@ export default function HomeownersManagementPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#0F3B3D]/10 flex items-center justify-center">
-                        <span className="text-[#0F3B3D] font-semibold text-sm">
+                      <div className="h-10 w-10 rounded-full bg-[#0F3B3D]/10 dark:bg-[#b48c3c]/10 flex items-center justify-center">
+                        <span className="text-[#0F3B3D] dark:text-[#b48c3c] font-semibold text-sm">
                           {homeowner.name?.charAt(0).toUpperCase() ?? "H"}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{homeowner.name}</p>
+                        <p className="font-medium text-foreground">{homeowner.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <p className="text-sm text-muted-foreground">{homeowner.email}</p>
                           <button

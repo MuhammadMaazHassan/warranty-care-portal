@@ -19,13 +19,6 @@ export async function GET(
       include: {
         homeowner: true,
         property: true,
-        conversation: {
-          include: {
-            messages: {
-              orderBy: { timestamp: "asc" }
-            }
-          }
-        }
       },
     });
 
@@ -73,10 +66,7 @@ export async function PATCH(
     // Get old ticket to check if status changed and verify company
     const oldTicket = await prisma.ticket.findUnique({
       where: { id },
-      include: { 
-        homeowner: true,
-        conversation: true
-      }
+      include: { homeowner: true }
     });
 
     if (!oldTicket) {
@@ -97,29 +87,7 @@ export async function PATCH(
       if (!approvedText || !approvedText.trim()) {
         return NextResponse.json({ message: "Cannot approve an empty draft response" }, { status: 400 });
       }
-
-      // Resolve or create conversation
-      let conversation = oldTicket.conversation;
-      if (!conversation) {
-        conversation = await prisma.conversation.create({
-          data: {
-            ticketId: oldTicket.id,
-            homeownerId: oldTicket.homeownerId
-          }
-        });
-      }
-
-      // Add as assistant chat message
-      await prisma.chatMessage.create({
-        data: {
-          conversationId: conversation.id,
-          role: "assistant",
-          content: approvedText.trim(),
-          timestamp: new Date()
-        }
-      });
-
-      // Clear the draft from ticket
+      // Clear the draft from ticket on approval
       updatedData.draftResponse = null;
     } else if (action === "reject") {
       // Clear the draft from ticket
@@ -160,4 +128,3 @@ export async function PATCH(
     return NextResponse.json({ message: "Error updating ticket" }, { status: 500 });
   }
 }
-

@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   User,
   Calendar,
-  MessageSquare,
   RefreshCcw,
   Send,
   CheckCircle,
@@ -104,24 +103,8 @@ export default function TicketDetail() {
       if (response.ok) {
         setDraftResponse(null);
         setDraftText("");
-        
-        // Append approved draft locally to conversation messages
         if (ticket) {
-          const newMsg = {
-            id: `approved-${Date.now()}`,
-            role: "assistant",
-            content: draftText,
-            timestamp: new Date().toISOString()
-          };
-          const messages = ticket.conversation?.messages || [];
-          setTicket({
-            ...ticket,
-            draftResponse: null,
-            conversation: {
-              ...(ticket.conversation || {}),
-              messages: [...messages, newMsg]
-            }
-          });
+          setTicket({ ...ticket, draftResponse: null });
         }
       } else {
         const errorData = await response.json();
@@ -202,8 +185,8 @@ export default function TicketDetail() {
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {draftResponse && (
-                <Card className="border-cyan-500/30 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
-                  <div className="bg-gradient-to-r from-cyan-600/20 to-blue-600/20 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+                <Card className="border-cyan-500/30 bg-linear-to-br from-slate-900 to-slate-950 text-slate-100 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+                  <div className="bg-linear-to-r from-cyan-600/20 to-blue-600/20 px-6 py-4 flex items-center justify-between border-b border-slate-800">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-cyan-500/20 rounded-lg">
                         <Sparkles className="h-5 w-5 text-cyan-400 animate-pulse" />
@@ -221,7 +204,7 @@ export default function TicketDetail() {
                     <p className="text-xs text-slate-400 leading-relaxed">
                       The Botpress AI assistant drafted the following response based on active warranty policies and DIY diagnostics. You can edit the text inline before delivering it to the homeowner.
                     </p>
-                    
+
                     <div className="relative">
                       <Textarea
                         value={draftText}
@@ -236,7 +219,7 @@ export default function TicketDetail() {
                       <Button
                         onClick={handleApproveDraft}
                         disabled={isProcessingDraft || !draftText.trim()}
-                        className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold transition duration-200 border-none shadow-md shadow-emerald-950/20 py-2.5"
+                        className="flex-1 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold transition duration-200 border-none shadow-md shadow-emerald-950/20 py-2.5"
                       >
                         {isProcessingDraft ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -280,8 +263,8 @@ export default function TicketDetail() {
               </Card>
 
               {ticket.chatSummary && (
-                <Card className="border-amber-500/20 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
-                  <div className="bg-gradient-to-r from-amber-600/10 to-orange-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
+                <Card className="border-amber-500/20 bg-linear-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
+                  <div className="bg-linear-to-r from-amber-600/10 to-orange-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
                     <div className="p-1.5 bg-amber-500/20 rounded-lg">
                       <Sparkles className="h-5 w-5 text-amber-400" />
                     </div>
@@ -310,8 +293,8 @@ export default function TicketDetail() {
                 }
 
                 return (
-                  <Card className="border-indigo-500/20 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
-                    <div className="bg-gradient-to-r from-indigo-600/10 to-blue-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
+                  <Card className="border-indigo-500/20 bg-linear-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
+                    <div className="bg-linear-to-r from-indigo-600/10 to-blue-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
                       <div className="p-1.5 bg-indigo-500/20 rounded-lg">
                         <Bot className="h-5 w-5 text-indigo-400" />
                       </div>
@@ -329,7 +312,7 @@ export default function TicketDetail() {
                               .replace(/([A-Z])/g, " $1")
                               .replace(/[_-]/g, " ")
                               .replace(/^\w/, (c) => c.toUpperCase());
-                            
+
                             const displayValue = typeof value === "object" ? JSON.stringify(value) : String(value);
 
                             return (
@@ -357,13 +340,13 @@ export default function TicketDetail() {
                   if (Array.isArray(parsed)) {
                     parsedRefs = parsed;
                   }
-                } catch (e) {}
+                } catch (e) { }
 
                 if (parsedRefs.length === 0) return null;
 
                 return (
-                  <Card className="border-cyan-500/20 bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
-                    <div className="bg-gradient-to-r from-cyan-600/10 to-teal-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
+                  <Card className="border-cyan-500/20 bg-linear-to-br from-slate-900 to-slate-950 text-slate-100 shadow-lg overflow-hidden">
+                    <div className="bg-linear-to-r from-cyan-600/10 to-teal-600/10 px-6 py-4 flex items-center gap-2 border-b border-slate-800">
                       <div className="p-1.5 bg-cyan-500/20 rounded-lg">
                         <FileText className="h-5 w-5 text-cyan-400" />
                       </div>
@@ -385,37 +368,7 @@ export default function TicketDetail() {
                   </Card>
                 );
               })()}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex gap-2">
-                    <MessageSquare className="h-5 w-5" /> Conversation Transcript
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                    {ticket.conversation?.messages && ticket.conversation.messages.length > 0 ? (
-                      ticket.conversation.messages.map((msg: any) => (
-                        <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                          <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                            msg.role === 'user' 
-                              ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                              : 'bg-muted rounded-tl-none'
-                          }`}>
-                            <p>{msg.content}</p>
-                            <span className="text-[10px] opacity-70 block mt-1">
-                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic text-center py-4">
-                        No transcript available for this ticket.
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+
             </div>
             <div className="space-y-6">
               <Card>

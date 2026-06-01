@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
+import { createClient } from "@supabase/supabase-js";
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+};
 
 export async function GET(request: Request) {
   try {
@@ -33,13 +42,59 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 403 });
     }
 
-    const data = await request.json();
-    const { name, size, url, communityId } = data;
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const communityId = formData.get("communityId") as string;
+    
+    if (!file) {
+      return NextResponse.json({ message: "No file provided" }, { status: 400 });
+    }
+
     const companyId = session.companyId || "demo-company";
 
+    // 1. Initialize Supabase Admin Client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 2. Ensure bucket exists
+    const bucketName = "knowledge_base";
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    if (!bucketsError) {
+      const bucketExists = buckets.some(b => b.name === bucketName);
+      if (!bucketExists) {
+        await supabase.storage.createBucket(bucketName, { public: true });
+      }
+    }
+
+    // 3. Upload file
+    const fileBuffer = await file.arrayBuffer();
+    const fileName = `${companyId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, fileBuffer, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error("Supabase upload error:", uploadError);
+      return NextResponse.json({ message: "Error uploading file to storage" }, { status: 500 });
+    }
+
+    // 4. Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+      
+    const url = publicUrlData.publicUrl;
+    const size = formatFileSize(file.size);
+
+    // 5. Save to database
     const doc = await prisma.knowledgeBaseDocument.create({
       data: {
-        name,
+        name: file.name,
         size,
         url,
         companyId,

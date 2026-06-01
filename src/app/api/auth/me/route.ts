@@ -36,6 +36,7 @@ export async function GET() {
     return NextResponse.json({
       ...dbUser,
       role: dbUser.role.toLowerCase(), // Normalize ADMIN→admin, HOMEOWNER→homeowner etc.
+      online: true,
     });
   } catch (error) {
     console.error("Auth me error:", error);

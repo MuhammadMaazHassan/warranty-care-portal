@@ -22,6 +22,7 @@ import {
   Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import AdminCompanyList from "@/components/admin/AdminCompanyList";
 
 // Types
 interface CompanyData {
@@ -231,261 +232,270 @@ export default function CompanyPage() {
         >
           {/* Header */}
           <motion.div variants={fadeInUp}>
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent dark:from-[#b48c3c] dark:to-[#d4af6c]">
-              Company Settings
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-[#0F3B3D] dark:text-[#b48c3c]" />
+              <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent dark:from-[#b48c3c] dark:to-[#d4af6c]">
+                {isAdmin ? "Registered Companies" : "Company Settings"}
+              </span>
             </h1>
             <p className="text-muted-foreground text-sm md:text-base mt-1">
               {isAdmin ? "View company profile, contact details, and warranty policy" : "Manage your profile, contact details, and warranty policy"}
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Company Information Card */}
-            <motion.div variants={cardVariants} whileHover="hover">
-              <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
-                <CardHeader className="border-b border-border/50">
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    Company Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-5 pt-6">
-                  {/* Avatar Section */}
-                  <div className="flex flex-col items-center gap-3 mb-2">
-                    <motion.div
-                      whileHover={!isAdmin ? { scale: 1.05 } : {}}
-                      whileTap={!isAdmin ? { scale: 0.95 } : {}}
-                      className={`relative group ${!isAdmin ? 'cursor-pointer' : ''}`}
-                      onClick={handleAvatarUpload}
-                    >
-                      <Avatar className="h-24 w-24 ring-2 ring-primary/20 transition-all group-hover:ring-primary/40">
-                        <AvatarImage src={company.logo} />
-                        <AvatarFallback className="bg-linear-to-br from-primary/20 to-primary/5 text-primary text-2xl font-bold">
-                          {company.name.charAt(0) || "C"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {!isAdmin && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Upload className="h-6 w-6 text-white" />
+          {isAdmin ? (
+            <AdminCompanyList />
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Company Information Card */}
+                <motion.div variants={cardVariants} whileHover="hover">
+                  <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                    <CardHeader className="border-b border-border/50">
+                      <CardTitle className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" />
+                        Company Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5 pt-6">
+                      {/* Avatar Section */}
+                      <div className="flex flex-col items-center gap-3 mb-2">
+                        <motion.div
+                          whileHover={!isAdmin ? { scale: 1.05 } : {}}
+                          whileTap={!isAdmin ? { scale: 0.95 } : {}}
+                          className={`relative group ${!isAdmin ? 'cursor-pointer' : ''}`}
+                          onClick={handleAvatarUpload}
+                        >
+                          <Avatar className="h-24 w-24 ring-2 ring-primary/20 transition-all group-hover:ring-primary/40">
+                            <AvatarImage src={company.logo} />
+                            <AvatarFallback className="bg-linear-to-br from-primary/20 to-primary/5 text-primary text-2xl font-bold">
+                              {company.name.charAt(0) || "C"}
+                            </AvatarFallback>
+                          </Avatar>
+                          {!isAdmin && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Upload className="h-6 w-6 text-white" />
+                            </div>
+                          )}
+                        </motion.div>
+                        {!isAdmin && (
+                          <p className="text-xs text-muted-foreground">
+                            Click to upload logo (coming soon)
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Form Fields */}
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-sm font-semibold">
+                            Company Name {isAdmin ? "" : "*"}
+                          </Label>
+                          <Input
+                            disabled={isAdmin}
+                            value={company.name}
+                            onChange={(e) => {
+                              setCompany({ ...company, name: e.target.value });
+                              if (errors.name)
+                                setErrors({ ...errors, name: undefined });
+                            }}
+                            className={
+                              errors.name
+                                ? "border-red-500 focus-visible:ring-red-500"
+                                : ""
+                            }
+                          />
+                          {errors.name && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-xs text-red-500 mt-1"
+                            >
+                              {errors.name}
+                            </motion.p>
+                          )}
                         </div>
-                      )}
-                    </motion.div>
-                    {!isAdmin && (
-                      <p className="text-xs text-muted-foreground">
-                        Click to upload logo (coming soon)
-                      </p>
-                    )}
-                  </div>
 
-                  {/* Form Fields */}
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-semibold">
-                        Company Name {isAdmin ? "" : "*"}
-                      </Label>
-                      <Input
-                        disabled={isAdmin}
-                        value={company.name}
-                        onChange={(e) => {
-                          setCompany({ ...company, name: e.target.value });
-                          if (errors.name)
-                            setErrors({ ...errors, name: undefined });
-                        }}
-                        className={
-                          errors.name
-                            ? "border-red-500 focus-visible:ring-red-500"
-                            : ""
-                        }
-                      />
-                      {errors.name && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-xs text-red-500 mt-1"
-                        >
-                          {errors.name}
-                        </motion.p>
-                      )}
-                    </div>
+                        <div>
+                          <Label className="text-sm font-semibold">Email {isAdmin ? "" : "*"}</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              disabled={isAdmin}
+                              type="email"
+                              className="pl-9"
+                              value={company.email}
+                              onChange={(e) => {
+                                setCompany({ ...company, email: e.target.value });
+                                if (errors.email)
+                                  setErrors({ ...errors, email: undefined });
+                              }}
+                            />
+                          </div>
+                          {errors.email && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-xs text-red-500 mt-1"
+                            >
+                              {errors.email}
+                            </motion.p>
+                          )}
+                        </div>
 
-                    <div>
-                      <Label className="text-sm font-semibold">Email {isAdmin ? "" : "*"}</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          disabled={isAdmin}
-                          type="email"
-                          className="pl-9"
-                          value={company.email}
-                          onChange={(e) => {
-                            setCompany({ ...company, email: e.target.value });
-                            if (errors.email)
-                              setErrors({ ...errors, email: undefined });
-                          }}
-                        />
+                        <div>
+                          <Label className="text-sm font-semibold">Phone {isAdmin ? "" : "*"}</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              disabled={isAdmin}
+                              className="pl-9"
+                              value={company.phone}
+                              onChange={(e) => {
+                                setCompany({ ...company, phone: e.target.value });
+                                if (errors.phone)
+                                  setErrors({ ...errors, phone: undefined });
+                              }}
+                            />
+                          </div>
+                          {errors.phone && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-xs text-red-500 mt-1"
+                            >
+                              {errors.phone}
+                            </motion.p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label className="text-sm font-semibold">Address</Label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Textarea
+                              disabled={isAdmin}
+                              rows={2}
+                              className="pl-9"
+                              value={company.address}
+                              onChange={(e) =>
+                                setCompany({ ...company, address: e.target.value })
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
-                      {errors.email && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-xs text-red-500 mt-1"
-                        >
-                          {errors.email}
-                        </motion.p>
-                      )}
-                    </div>
 
-                    <div>
-                      <Label className="text-sm font-semibold">Phone {isAdmin ? "" : "*"}</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          disabled={isAdmin}
-                          className="pl-9"
-                          value={company.phone}
-                          onChange={(e) => {
-                            setCompany({ ...company, phone: e.target.value });
-                            if (errors.phone)
-                              setErrors({ ...errors, phone: undefined });
-                          }}
-                        />
-                      </div>
-                      {errors.phone && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-xs text-red-500 mt-1"
+                      {!isAdmin && (
+                        <motion.div
+                          variants={buttonVariants}
+                          whileTap="tap"
+                          whileHover="hover"
                         >
-                          {errors.phone}
-                        </motion.p>
+                          <Button
+                            onClick={handleSaveInfo}
+                            disabled={savingInfo}
+                            className="w-full gap-2"
+                          >
+                            {savingInfo ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4" />
+                            )}
+                            {savingInfo ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </motion.div>
                       )}
-                    </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
-                    <div>
-                      <Label className="text-sm font-semibold">Address</Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                {/* Warranty Policy Card */}
+                <motion.div variants={cardVariants} whileHover="hover">
+                  <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                    <CardHeader className="border-b border-border/50">
+                      <CardTitle className="flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                        Warranty Policy
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5 pt-6">
+                      <div>
+                        <Label className="text-sm font-semibold">
+                          Policy Text (used by agent)
+                        </Label>
                         <Textarea
                           disabled={isAdmin}
-                          rows={2}
-                          className="pl-9"
-                          value={company.address}
+                          rows={12}
+                          value={company.warrantyPolicy}
                           onChange={(e) =>
-                            setCompany({ ...company, address: e.target.value })
+                            setCompany({
+                              ...company,
+                              warrantyPolicy: e.target.value,
+                            })
                           }
+                          className="mt-2 font-mono text-sm"
+                          placeholder="Enter your warranty policy details..."
                         />
                       </div>
-                    </div>
-                  </div>
+                      <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
+                        <p className="font-medium mb-1">ℹ️ How this is used</p>
+                        <p>
+                          The AI agent will reference this warranty policy when
+                          answering homeowner questions about coverage, claims, and
+                          limitations.
+                        </p>
+                      </div>
+                      
+                      {!isAdmin && (
+                        <motion.div
+                          variants={buttonVariants}
+                          whileTap="tap"
+                          whileHover="hover"
+                        >
+                          <Button
+                            onClick={handleSavePolicy}
+                            disabled={savingPolicy}
+                            className="w-full gap-2"
+                            variant="outline"
+                          >
+                            {savingPolicy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4" />
+                            )}
+                            {savingPolicy ? "Saving..." : "Save Policy"}
+                          </Button>
+                        </motion.div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
 
-                  {!isAdmin && (
-                    <motion.div
-                      variants={buttonVariants}
-                      whileTap="tap"
-                      whileHover="hover"
-                    >
-                      <Button
-                        onClick={handleSaveInfo}
-                        disabled={savingInfo}
-                        className="w-full gap-2"
-                      >
-                        {savingInfo ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        {savingInfo ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </motion.div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Warranty Policy Card */}
-            <motion.div variants={cardVariants} whileHover="hover">
-              <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
-                <CardHeader className="border-b border-border/50">
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                    Warranty Policy
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-5 pt-6">
-                  <div>
-                    <Label className="text-sm font-semibold">
-                      Policy Text (used by agent)
-                    </Label>
-                    <Textarea
-                      disabled={isAdmin}
-                      rows={12}
-                      value={company.warrantyPolicy}
-                      onChange={(e) =>
-                        setCompany({
-                          ...company,
-                          warrantyPolicy: e.target.value,
-                        })
-                      }
-                      className="mt-2 font-mono text-sm"
-                      placeholder="Enter your warranty policy details..."
-                    />
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
-                    <p className="font-medium mb-1">ℹ️ How this is used</p>
-                    <p>
-                      The AI agent will reference this warranty policy when
-                      answering homeowner questions about coverage, claims, and
-                      limitations.
+              {/* Help Card */}
+              <motion.div
+                variants={fadeInUp}
+                initial="hidden"
+                animate="visible"
+                transition={{ delay: 0.2 }}
+              >
+                <Card className="border-l-4 border-l-secondary bg-linear-to-r from-secondary/5 to-transparent dark:from-secondary/10">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-secondary" />
+                      Changes take effect immediately
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      All changes are saved locally and will be used by the AI agent in real-time. Your warranty policy is automatically referenced in conversations.
                     </p>
-                  </div>
-                  
-                  {!isAdmin && (
-                    <motion.div
-                      variants={buttonVariants}
-                      whileTap="tap"
-                      whileHover="hover"
-                    >
-                      <Button
-                        onClick={handleSavePolicy}
-                        disabled={savingPolicy}
-                        className="w-full gap-2"
-                        variant="outline"
-                      >
-                        {savingPolicy ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        {savingPolicy ? "Saving..." : "Save Policy"}
-                      </Button>
-                    </motion.div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Help Card */}
-          <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="border-l-4 border-l-secondary bg-linear-to-r from-secondary/5 to-transparent dark:from-secondary/10">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-secondary" />
-                  {isAdmin ? "Admin Read-Only Access" : "Changes take effect immediately"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {isAdmin ? "You are viewing this company's profile and warranty policy. Only company staff can modify these settings." : "All changes are saved locally and will be used by the AI agent in real-time. Your warranty policy is automatically referenced in conversations."}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </>
+          )}
         </motion.div>
       </PortalLayout>
     </ProtectedRoute>
