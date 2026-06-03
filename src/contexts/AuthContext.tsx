@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent } from "@supabase/supabase-js";
 
 export type UserRole = "admin" | "staff" | "homeowner";
 
@@ -81,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
+      (event: AuthChangeEvent) => {
         if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
           // Avoid double-fetch: INITIAL_SESSION fires on mount, skip the manual call below
           if (event === "INITIAL_SESSION") initialFetchDone = true;
