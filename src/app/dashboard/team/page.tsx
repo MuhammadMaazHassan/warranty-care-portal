@@ -354,7 +354,7 @@ export default function TeamManagementPage() {
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-[#E8B86B] mt-0.5 shrink-0" />
                 <div className="text-sm">
-                  <p className="font-medium text-gray-900">Controlled Access Policy</p>
+                  <p className="font-medium text-gray-900 dark:text-slate-100">Controlled Access Policy</p>
                   <p className="text-muted-foreground mt-0.5">
                     {user.role === "admin" ? (
                       <>
@@ -454,7 +454,7 @@ export default function TeamManagementPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleStartEdit(staff)}
-                              className="text-gray-500 hover:text-[#0F3B3D] dark:hover:text-[#b48c3c] hover:bg-gray-50"
+                              className="text-gray-500 dark:text-slate-400 hover:text-[#0F3B3D] dark:hover:text-[#b48c3c] hover:bg-gray-50 dark:hover:bg-slate-800"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>

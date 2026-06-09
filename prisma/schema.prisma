@@ -37,6 +37,7 @@ model User {
   company         Company?  @relation(fields: [companyId], references: [id])
   properties      Property[]
   tickets         Ticket[]  @relation("HomeownerTickets")
+  knowledgeBaseId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
@@ -54,6 +55,7 @@ model Company {
   knowledgeBase   KnowledgeBaseDocument[]
   integrations    Integration[]
   communities     Community[]
+  knowledgeBaseId String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 }
@@ -111,12 +113,6 @@ model Ticket {
 }
 
 
-enum DocumentType {
-  MANUAL
-  VIDEO
-  DIY_GUIDE
-}
-
 model Community {
   id          String   @id @default(cuid())
   companyId   String
@@ -137,7 +133,6 @@ model KnowledgeBaseDocument {
   name          String
   size          String
   url           String
-  documentType  DocumentType   @default(MANUAL)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }

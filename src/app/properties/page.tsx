@@ -157,7 +157,7 @@ export default function PropertiesPage() {
       zipCode: p.zipCode || "",
       areaOfHome: p.areaOfHome || "",
       coeDate: p.coeDate ? new Date(p.coeDate).toISOString().split("T")[0] : "",
-      coverageTermYears: (p.coeDate && p.coverageTerm) 
+      coverageTermYears: (p.coeDate && p.coverageTerm)
         ? Math.max(1, new Date(p.coverageTerm).getFullYear() - new Date(p.coeDate).getFullYear()).toString()
         : "1",
       homeownerId: p.homeownerId,
@@ -339,43 +339,43 @@ export default function PropertiesPage() {
                   const coverageYear = getWarrantyYear(p.coeDate);
                   return (
                     <motion.div key={p.id} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
-                      <Card className="overflow-hidden hover:shadow-lg transition-all border-l-4 border-l-[#0F3B3D]">
-                        <div className="bg-gray-50/50 px-5 pt-5 pb-4">
+                      <Card className="overflow-hidden hover:shadow-lg transition-all border-l-4 border-l-[#0F3B3D] bg-white dark:bg-slate-900/60 dark:border-l-[#a0c5c7]">
+                        <div className="bg-gray-50/50 dark:bg-slate-950/20 px-5 pt-5 pb-4 border-b dark:border-slate-800/40">
                           <div className="flex justify-between items-start gap-4">
                             <div className="flex items-center gap-3">
-                              <div className="bg-[#0F3B3D]/10 p-2.5 rounded-xl text-[#0F3B3D]">
+                              <div className="bg-[#0F3B3D]/10 dark:bg-[#0f3b3d]/30 p-2.5 rounded-xl text-[#0F3B3D] dark:text-[#a0c5c7]">
                                 <Building2 className="h-5 w-5" />
                               </div>
                               <div>
-                                <h3 className="font-bold text-[#0F3B3D] text-lg leading-tight">{p.address}</h3>
+                                <h3 className="font-bold text-[#0F3B3D] dark:text-slate-100 text-lg leading-tight">{p.address}</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   {p.city || ""}, {p.state || ""} {p.zipCode || ""}
                                 </p>
                               </div>
                             </div>
-                            <Badge className="bg-[#0F3B3D] text-white shrink-0">Year {coverageYear} Coverage</Badge>
+                            <Badge className="bg-[#0F3B3D] dark:bg-[#b48c3c] text-white shrink-0">Year {coverageYear} Coverage</Badge>
                           </div>
                         </div>
                         <CardContent className="pt-5 space-y-4">
-                          <div className="grid grid-cols-2 gap-4 text-sm border-b pb-4">
+                          <div className="grid grid-cols-2 gap-4 text-sm border-b dark:border-slate-800 pb-4">
                             <div>
-                              <span className="text-gray-400 block text-xs uppercase font-medium">Warranty Start (COE)</span>
-                              <span className="font-semibold text-gray-700 flex items-center gap-1.5 mt-1">
-                                <Calendar className="h-4 w-4 text-[#0F3B3D]" />
+                              <span className="text-gray-400 dark:text-slate-500 block text-xs uppercase font-medium">Warranty Start (COE)</span>
+                              <span className="font-semibold text-gray-700 dark:text-slate-300 flex items-center gap-1.5 mt-1">
+                                <Calendar className="h-4 w-4 text-[#0F3B3D] dark:text-[#a0c5c7]" />
                                 {p.coeDate ? new Date(p.coeDate).toLocaleDateString() : "N/A"}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-400 block text-xs uppercase font-medium">Warranty Term</span>
+                              <span className="text-gray-400 dark:text-slate-500 block text-xs uppercase font-medium">Warranty Term</span>
                               <span className="font-semibold text-[#b48c3c] mt-1 block">
                                 {coverageYear === 1 ? "1-Year Workmanship" : coverageYear === 2 ? "2-Year Distribution" : "10-Year Structural"}
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between pt-1">
-                            <span className="text-xs text-gray-500 font-medium">Have an issue with this property?</span>
+                            <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">Have an issue with this property?</span>
                             <Link href="/tickets">
-                              <Button size="sm" variant="outline" className="text-[#0F3B3D] border-[#0F3B3D] hover:bg-[#0F3B3D] hover:text-white gap-1 text-xs">
+                              <Button size="sm" variant="outline" className="text-[#0F3B3D] border-[#0F3B3D] hover:bg-[#0F3B3D] hover:text-white dark:text-[#a0c5c7] dark:border-[#a0c5c7] dark:hover:bg-[#0F3B3D] dark:hover:text-white gap-1 text-xs">
                                 Ask AI <ChevronRight className="h-3 w-3" />
                               </Button>
                             </Link>
@@ -386,10 +386,10 @@ export default function PropertiesPage() {
                   );
                 })
               ) : (
-                <div className="col-span-2 text-center py-16 bg-white border rounded-2xl">
-                  <Building2 className="h-14 w-14 mx-auto opacity-30 text-[#0F3B3D] mb-3" />
-                  <h3 className="font-bold text-gray-700 text-lg">No properties found</h3>
-                  <p className="text-sm text-gray-400 max-w-sm mx-auto mt-1">
+                <div className="col-span-2 text-center py-16 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-2xl">
+                  <Building2 className="h-14 w-14 mx-auto opacity-30 text-[#0F3B3D] dark:text-[#a0c5c7] mb-3" />
+                  <h3 className="font-bold text-gray-700 dark:text-slate-200 text-lg">No properties found</h3>
+                  <p className="text-sm text-gray-400 dark:text-slate-500 max-w-sm mx-auto mt-1">
                     Click &quot;Add Property&quot; to register a new property under your account.
                   </p>
                 </div>
@@ -428,29 +428,29 @@ export default function PropertiesPage() {
                           const year = getWarrantyYear(p.coeDate);
                           return (
                             <TableRow key={p.id}>
-                              <TableCell className="font-semibold text-gray-800">
+                              <TableCell className="font-semibold text-gray-800 dark:text-slate-100">
                                 <div className="flex items-center gap-2">
-                                  <Building2 className="h-4 w-4 text-[#0F3B3D] shrink-0" />
+                                  <Building2 className="h-4 w-4 text-[#0F3B3D] dark:text-[#a0c5c7] shrink-0" />
                                   {p.address}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-gray-500">
+                              <TableCell className="text-gray-500 dark:text-slate-400">
                                 {p.city || "N/A"}{p.zipCode ? `, ${p.zipCode}` : ""}
                               </TableCell>
-                              <TableCell className="text-gray-500 whitespace-nowrap">
-                                {p.areaOfHome || "N/A"}
+                              <TableCell className="text-gray-500 dark:text-slate-400 whitespace-nowrap">
+                                {p.areaOfHome + " sq ft" || "N/A"}
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col">
-                                  <span className="font-medium text-gray-700">{p.homeowner?.name || "N/A"}</span>
-                                  <span className="text-xs text-gray-400">{p.homeowner?.email}</span>
+                                  <span className="font-medium text-gray-700 dark:text-slate-200">{p.homeowner?.name || "N/A"}</span>
+                                  <span className="text-xs text-gray-400 dark:text-slate-400">{p.homeowner?.email}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-gray-500">
+                              <TableCell className="text-gray-500 dark:text-slate-400">
                                 {p.coeDate ? new Date(p.coeDate).toLocaleDateString() : "N/A"}
                               </TableCell>
                               <TableCell>
-                                <Badge className="bg-[#0F3B3D]/10 text-[#0F3B3D] hover:bg-[#0F3B3D]/15 font-semibold">
+                                <Badge className="bg-[#0F3B3D]/10 text-[#0F3B3D] hover:bg-[#0F3B3D]/15 dark:bg-[#0F3B3D]/25 dark:text-[#a0c5c7] dark:hover:bg-[#0F3B3D]/35 font-semibold border-none">
                                   {p.coverageTerm ? new Date(p.coverageTerm).toLocaleDateString() : `Year ${year}`}
                                 </Badge>
                               </TableCell>
@@ -459,7 +459,7 @@ export default function PropertiesPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-gray-500 hover:text-[#0F3B3D] hover:bg-[#0F3B3D]/10"
+                                    className="h-8 w-8 text-gray-500 hover:text-[#0F3B3D] hover:bg-[#0F3B3D]/10 dark:text-slate-400 dark:hover:text-[#a0c5c7] dark:hover:bg-[#0F3B3D]/20"
                                     onClick={() => openEditModal(p)}
                                     title="Edit property"
                                   >
@@ -468,7 +468,7 @@ export default function PropertiesPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50"
+                                    className="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/20"
                                     onClick={() => setDeleteTarget(p)}
                                     title="Delete property"
                                   >

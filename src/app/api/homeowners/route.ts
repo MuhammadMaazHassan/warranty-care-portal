@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 // Initialize Supabase Admin client for auth management
 const supabaseAdmin = createClient(
@@ -39,16 +40,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let createdSupabaseUserId: string | null = null;
   try {
     const session = await getServerSession(request);
     if (!session || (session.role !== "ADMIN" && session.role !== "STAFF")) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
-    const { name, email, password } = await request.json();
+    const { name, email } = await request.json();
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
       return NextResponse.json({ message: "Missing fields" }, { status: 400 });
     }
 
@@ -57,26 +57,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Email already in use" }, { status: 400 });
     }
 
-    // 1. Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name },
-    });
+    // Generate a cryptographically secure random password for database validation
+    const systemPassword = crypto.randomUUID();
+    const hashedPassword = await bcrypt.hash(systemPassword, 10);
 
-    if (authError) {
-      console.error("Supabase homeowner auth creation error:", authError);
-      return NextResponse.json(
-        { message: authError.message || "Failed to create authentication account" },
-        { status: 400 }
-      );
-    }
-
-    createdSupabaseUserId = authData.user.id;
-
-    // 2. Create user in Prisma DB
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Create user in Prisma DB only (no login account required)
     const homeowner = await prisma.user.create({
       data: {
         name,
@@ -97,10 +82,6 @@ export async function POST(request: Request) {
     return NextResponse.json(homeowner);
   } catch (error) {
     console.error("Failed to create homeowner:", error);
-    // Roll back Supabase user if local DB insertion fails
-    if (createdSupabaseUserId) {
-      await supabaseAdmin.auth.admin.deleteUser(createdSupabaseUserId);
-    }
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
 }

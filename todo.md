@@ -53,6 +53,8 @@
 - [x] **Agent Traceability**: Tracked and logged directly in Botpress backend conversation logs.
 - [x] **MAS Trigger Routing Configuration**: Configured and executed directly within Botpress workflow orchestrator.
 - [x] **Reviewer Agent Toggle**: Orchestrated directly inside Botpress workspace settings.
+- [x] **Dynamic User KB Mapping**: Add `knowledgeBaseId` field to User and Company models.
+- [x] **Shared/Common Knowledge Base Files**: Support uploading and tagging documents as "Shared/Common" (all communities) via UI and bulk ZIP uploads.
 
 ---
 

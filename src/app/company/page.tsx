@@ -64,7 +64,7 @@ const buttonVariants = {
 
 export default function CompanyPage() {
   const { user, updateProfile } = useAuth();
-  
+
   const [company, setCompany] = useState<CompanyData & { id?: string }>({
     name: "",
     logo: "",
@@ -275,249 +275,250 @@ export default function CompanyPage() {
           </motion.div>
 
           <div className="grid md:grid-cols-2 gap-6">
-                {/* Company Information Card */}
-                <motion.div variants={cardVariants} whileHover="hover">
-                  <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
-                    <CardHeader className="border-b border-border/50">
-                      <CardTitle className="flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-primary" />
-                        Company Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-5 pt-6">
-                      <div className="flex flex-col items-center gap-3 mb-2">
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="relative group cursor-pointer"
-                          onClick={() => document.getElementById("logo-upload")?.click()}
-                        >
-                          <Avatar className={`h-24 w-24 ring-2 ring-primary/20 transition-all group-hover:ring-primary/40 ${uploadingLogo ? "opacity-50" : ""}`}>
-                            <AvatarImage src={company.logo} />
-                            <AvatarFallback className="bg-linear-to-br from-primary/20 to-primary/5 text-primary text-2xl font-bold">
-                              {company.name.charAt(0) || "C"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            {uploadingLogo ? (
-                              <Loader2 className="h-6 w-6 text-white animate-spin" />
-                            ) : (
-                              <Upload className="h-6 w-6 text-white" />
-                            )}
-                          </div>
-                        </motion.div>
-                        <input
-                          id="logo-upload"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarUpload}
-                          disabled={uploadingLogo}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {uploadingLogo ? "Uploading..." : "Click to upload logo"}
-                        </p>
+            {/* Company Information Card */}
+            <motion.div variants={cardVariants} whileHover="hover">
+              <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                <CardHeader className="border-b border-border/50">
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    Company Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5 pt-6">
+                  <div className="flex flex-col items-center gap-3 mb-2">
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="relative group cursor-pointer"
+                      onClick={() => document.getElementById("logo-upload")?.click()}
+                    >
+                      <Avatar className={`h-24 w-24 ring-2 ring-primary/20 transition-all group-hover:ring-primary/40 ${uploadingLogo ? "opacity-50" : ""}`}>
+                        <AvatarImage src={company.logo} />
+                        <AvatarFallback className="bg-linear-to-br from-primary/20 to-primary/5 text-primary text-2xl font-bold">
+                          {company.name.charAt(0) || "C"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        {uploadingLogo ? (
+                          <Loader2 className="h-6 w-6 text-white animate-spin" />
+                        ) : (
+                          <Upload className="h-6 w-6 text-white" />
+                        )}
                       </div>
-
-                      {/* Form Fields */}
-                      <div className="space-y-4">
-                        <div>
-                          <Label className="text-sm font-semibold">
-                            Company Name *
-                          </Label>
-                          <Input
-                            value={company.name}
-                            onChange={(e) => {
-                              setCompany({ ...company, name: e.target.value });
-                              if (errors.name)
-                                setErrors({ ...errors, name: undefined });
-                            }}
-                            className={
-                              errors.name
-                                ? "border-red-500 focus-visible:ring-red-500"
-                                : ""
-                            }
-                          />
-                          {errors.name && (
-                            <motion.p
-                              initial={{ opacity: 0, y: -5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-xs text-red-500 mt-1"
-                            >
-                              {errors.name}
-                            </motion.p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-sm font-semibold">Email *</Label>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type="email"
-                              className="pl-9 bg-muted/50 text-muted-foreground cursor-not-allowed"
-                              value={company.email}
-                              disabled
-                              readOnly
-                            />
-                          </div>
-                          {errors.email && (
-                            <motion.p
-                              initial={{ opacity: 0, y: -5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-xs text-red-500 mt-1"
-                            >
-                              {errors.email}
-                            </motion.p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-sm font-semibold">Phone *</Label>
-                          <div className="relative">
-                            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              className="pl-9"
-                              value={company.phone}
-                              onChange={(e) => {
-                                setCompany({ ...company, phone: e.target.value });
-                                if (errors.phone)
-                                  setErrors({ ...errors, phone: undefined });
-                              }}
-                            />
-                          </div>
-                          {errors.phone && (
-                            <motion.p
-                              initial={{ opacity: 0, y: -5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-xs text-red-500 mt-1"
-                            >
-                              {errors.phone}
-                            </motion.p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-sm font-semibold">Address</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Textarea
-                              rows={2}
-                              className="pl-9"
-                              value={company.address}
-                              onChange={(e) =>
-                                setCompany({ ...company, address: e.target.value })
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <motion.div
-                        variants={buttonVariants}
-                        whileTap="tap"
-                        whileHover="hover"
-                      >
-                        <Button
-                          onClick={handleSaveInfo}
-                          disabled={savingInfo}
-                          className="w-full gap-2"
-                        >
-                          {savingInfo ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          {savingInfo ? "Saving..." : "Save Changes"}
-                        </Button>
-                      </motion.div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Warranty Policy Card */}
-                <motion.div variants={cardVariants} whileHover="hover">
-                  <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
-                    <CardHeader className="border-b border-border/50">
-                      <CardTitle className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                        Warranty Policy
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-5 pt-6">
-                      <div>
-                        <Label className="text-sm font-semibold">
-                          Policy Text (used by agent)
-                        </Label>
-                        <Textarea
-                          rows={12}
-                          value={company.warrantyPolicy}
-                          onChange={(e) =>
-                            setCompany({
-                              ...company,
-                              warrantyPolicy: e.target.value,
-                            })
-                          }
-                          className="mt-2 font-mono text-sm"
-                          placeholder="Enter your warranty policy details..."
-                        />
-                      </div>
-                      <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
-                        <p className="font-medium mb-1">ℹ️ How this is used</p>
-                        <p>
-                          The AI agent will reference this warranty policy when
-                          answering homeowner questions about coverage, claims, and
-                          limitations.
-                        </p>
-                      </div>
-                      
-                      <motion.div
-                        variants={buttonVariants}
-                        whileTap="tap"
-                        whileHover="hover"
-                      >
-                        <Button
-                          onClick={handleSavePolicy}
-                          disabled={savingPolicy}
-                          className="w-full gap-2"
-                          variant="outline"
-                        >
-                          {savingPolicy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          {savingPolicy ? "Saving..." : "Save Policy"}
-                        </Button>
-                      </motion.div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
-
-              {/* Help Card */}
-              <motion.div
-                variants={fadeInUp}
-                initial="hidden"
-                animate="visible"
-                transition={{ delay: 0.2 }}
-              >
-                <Card className="border-l-4 border-l-secondary bg-linear-to-r from-secondary/5 to-transparent dark:from-secondary/10">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-secondary" />
-                      Changes take effect immediately
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      All changes are saved securely and will be used by the AI agent in real-time. Your warranty policy is automatically referenced in conversations.
+                    </motion.div>
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingLogo}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {uploadingLogo ? "Uploading..." : "Click to upload logo"}
                     </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                  </div>
+
+                  {/* Form Fields */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold">
+                        Company Name *
+                      </Label>
+                      <Input
+                        value={company.name}
+                        onChange={(e) => {
+                          setCompany({ ...company, name: e.target.value });
+                          if (errors.name)
+                            setErrors({ ...errors, name: undefined });
+                        }}
+                        className={
+                          errors.name
+                            ? "border-red-500 focus-visible:ring-red-500"
+                            : ""
+                        }
+                      />
+                      {errors.name && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xs text-red-500 mt-1"
+                        >
+                          {errors.name}
+                        </motion.p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold">Email *</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="email"
+                          className="pl-9 bg-muted/50 text-muted-foreground cursor-not-allowed"
+                          value={company.email}
+                          disabled
+                          readOnly
+                        />
+                      </div>
+                      {errors.email && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xs text-red-500 mt-1"
+                        >
+                          {errors.email}
+                        </motion.p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold">Phone *</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          className="pl-9"
+                          value={company.phone}
+                          onChange={(e) => {
+                            const sanitized = e.target.value.replace(/[^0-9+\-()\s]/g, "");
+                            setCompany({ ...company, phone: sanitized });
+                            if (errors.phone)
+                              setErrors({ ...errors, phone: undefined });
+                          }}
+                        />
+                      </div>
+                      {errors.phone && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xs text-red-500 mt-1"
+                        >
+                          {errors.phone}
+                        </motion.p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold">Address</Label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Textarea
+                          rows={2}
+                          className="pl-9"
+                          value={company.address}
+                          onChange={(e) =>
+                            setCompany({ ...company, address: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <motion.div
+                    variants={buttonVariants}
+                    whileTap="tap"
+                    whileHover="hover"
+                  >
+                    <Button
+                      onClick={handleSaveInfo}
+                      disabled={savingInfo}
+                      className="w-full gap-2"
+                    >
+                      {savingInfo ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {savingInfo ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Warranty Policy Card */}
+            <motion.div variants={cardVariants} whileHover="hover">
+              <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                <CardHeader className="border-b border-border/50">
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                    Warranty Policy
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5 pt-6">
+                  <div>
+                    <Label className="text-sm font-semibold">
+                      Policy Text (used by agent)
+                    </Label>
+                    <Textarea
+                      rows={12}
+                      value={company.warrantyPolicy}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          warrantyPolicy: e.target.value,
+                        })
+                      }
+                      className="mt-2 font-mono text-sm"
+                      placeholder="Enter your warranty policy details..."
+                    />
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
+                    <p className="font-medium mb-1">ℹ️ How this is used</p>
+                    <p>
+                      The AI agent will reference this warranty policy when
+                      answering homeowner questions about coverage, claims, and
+                      limitations.
+                    </p>
+                  </div>
+
+                  <motion.div
+                    variants={buttonVariants}
+                    whileTap="tap"
+                    whileHover="hover"
+                  >
+                    <Button
+                      onClick={handleSavePolicy}
+                      disabled={savingPolicy}
+                      className="w-full gap-2"
+                      variant="outline"
+                    >
+                      {savingPolicy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {savingPolicy ? "Saving..." : "Save Policy"}
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Help Card */}
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-l-4 border-l-secondary bg-linear-to-r from-secondary/5 to-transparent dark:from-secondary/10">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-secondary" />
+                  Information about Ai.Lumen
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Ai.Lumen is a platform that provides AI-powered solutions for home builders. Our platform helps home builders to automate their warranty management process and provides a seamless experience for homeowners.
+                </p>
+              </CardContent>
+            </Card>
           </motion.div>
-        </PortalLayout>
+        </motion.div>
+      </PortalLayout>
     </ProtectedRoute>
   );
 }

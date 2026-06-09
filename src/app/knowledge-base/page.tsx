@@ -29,6 +29,14 @@ import {
   FolderOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Types
 interface Community {
@@ -65,18 +73,20 @@ export default function KnowledgeBasePage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string>("");
   const [isDragActive, setIsDragActive] = useState(false);
-  
+
   const [toastMessage, setToastMessage] = useState<{
     type: "success" | "error" | "info";
     text: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const zipInputRef = useRef<HTMLInputElement>(null);
 
   // New Community Form State
   const [showCommunityForm, setShowCommunityForm] = useState(false);
   const [newCommunityName, setNewCommunityName] = useState("");
-  const [newCommunityColor, setNewCommunityColor] = useState("#0F3B3D");
+
+  // Delete Confirmation State
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,7 +95,7 @@ export default function KnowledgeBasePage() {
         fetch("/api/knowledge-base"),
         fetch("/api/communities")
       ]);
-      
+
       if (docsRes.ok) {
         const data: any[] = await docsRes.json();
         setDocuments(data.map((d: any) => ({
@@ -97,7 +107,7 @@ export default function KnowledgeBasePage() {
           community: d.community
         })));
       }
-      
+
       if (commsRes.ok) {
         setCommunities(await commsRes.json());
       }
@@ -113,7 +123,7 @@ export default function KnowledgeBasePage() {
   }, []);
 
   const filteredDocuments = documents.filter((doc) =>
-    doc.name.toLowerCase().includes(search.toLowerCase()) || 
+    doc.name.toLowerCase().includes(search.toLowerCase()) ||
     doc.community?.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -122,102 +132,76 @@ export default function KnowledgeBasePage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleFileUpload = async (file: File) => {
+  const handleMultipleFilesUpload = async (files: FileList | File[]) => {
     if (isAdmin) return;
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      showToast("error", "Only PDF and DOCX files are allowed");
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      showToast("error", "File size must be less than 10MB");
-      return;
-    }
-
-    if (!selectedCommunityId) {
-      showToast("error", "Please select a community first.");
-      return;
-    }
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
     setUploading(true);
-    setUploadProgress(40);
+    let successCount = 0;
+    let failCount = 0;
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("communityId", selectedCommunityId);
-
-      const response = await fetch("/api/knowledge-base", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const d = await response.json();
-        const newDoc: Document = {
-          id: d.id,
-          name: d.name,
-          size: d.size,
-          sizeBytes: file.size,
-          uploaded: new Date(d.createdAt).toLocaleDateString(),
-          community: d.community
-        };
-
-        setDocuments((prev) => [newDoc, ...prev]);
-        setUploadProgress(100);
-        showToast("success", `${file.name} uploaded successfully!`);
-      } else {
-        showToast("error", "Failed to upload document");
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      const allowedTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        showToast("error", `Skipped ${file.name}: Only PDF and DOCX files are allowed`);
+        failCount++;
+        continue;
       }
-    } catch (error) {
-      showToast("error", "Error uploading to database");
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
 
-  const handleZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (isAdmin) return;
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    const file = files[0];
-    if (!file.name.endsWith('.zip')) {
-      showToast("error", "Only ZIP files are allowed for bulk upload");
-      return;
-    }
-
-    setUploading(true);
-    setUploadProgress(20);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/knowledge-base/bulk", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        showToast("success", `Processed ${data.documentsImported} files across ${data.communitiesCreated} new communities.`);
-        await fetchData(); // Reload everything
-      } else {
-        showToast("error", "Failed to process ZIP file");
+      if (file.size > 10 * 1024 * 1024) {
+        showToast("error", `Skipped ${file.name}: File size must be less than 10MB`);
+        failCount++;
+        continue;
       }
-    } catch (error) {
-      showToast("error", "Error connecting to server for ZIP processing");
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-      if (zipInputRef.current) zipInputRef.current.value = "";
+
+      setUploadProgress(Math.round(((i) / fileArray.length) * 100));
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("communityId", selectedCommunityId);
+
+        const response = await fetch("/api/knowledge-base", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const d = await response.json();
+          const newDoc: Document = {
+            id: d.id,
+            name: d.name,
+            size: d.size,
+            sizeBytes: file.size,
+            uploaded: new Date(d.createdAt).toLocaleDateString(),
+            community: d.community
+          };
+
+          setDocuments((prev) => [newDoc, ...prev]);
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        failCount++;
+      }
+    }
+
+    setUploading(false);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (successCount > 0 && failCount === 0) {
+      showToast("success", `Uploaded ${successCount} file(s) successfully!`);
+    } else if (successCount > 0 && failCount > 0) {
+      showToast("info", `Uploaded ${successCount} file(s) successfully. Failed/skipped ${failCount}.`);
+    } else if (failCount > 0) {
+      showToast("error", `Failed to upload files.`);
     }
   };
 
@@ -233,15 +217,19 @@ export default function KnowledgeBasePage() {
       showToast("error", "Error connecting to server");
     }
   };
-  
+
   const handleCreateCommunity = async () => {
     if (!newCommunityName.trim()) return;
-    
+
+    // Pick a random aesthetic theme color
+    const colors = ["#0F3B3D", "#1E3A8A", "#4C1D95", "#064E3B", "#701A75", "#7C2D12", "#0F172A"];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
     try {
       const res = await fetch("/api/communities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCommunityName, color: newCommunityColor }),
+        body: JSON.stringify({ name: newCommunityName, color: randomColor }),
       });
       if (res.ok) {
         const comm = await res.json();
@@ -284,10 +272,10 @@ export default function KnowledgeBasePage() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    
+
     if (isAdmin) return;
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleMultipleFilesUpload(e.dataTransfer.files);
     }
   }, [isAdmin, selectedCommunityId]); // depend on community
 
@@ -301,11 +289,10 @@ export default function KnowledgeBasePage() {
               initial={{ opacity: 0, y: -50, x: "-50%" }}
               animate={{ opacity: 1, y: 0, x: "-50%" }}
               exit={{ opacity: 0, y: -50, x: "-50%" }}
-              className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${
-                toastMessage.type === "success" ? "bg-green-50 text-green-800" :
-                toastMessage.type === "error" ? "bg-red-50 text-red-800" :
-                "bg-blue-50 text-blue-800"
-              }`}
+              className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${toastMessage.type === "success" ? "bg-green-50 text-green-800" :
+                  toastMessage.type === "error" ? "bg-red-50 text-red-800" :
+                    "bg-blue-50 text-blue-800"
+                }`}
             >
               {toastMessage.type === "success" && <CheckCircle2 className="h-5 w-5" />}
               {toastMessage.type === "error" && <X className="h-5 w-5" />}
@@ -325,15 +312,6 @@ export default function KnowledgeBasePage() {
                 {isAdmin ? "View builder documents connected to the Botpress AI assistant" : "Manage communities and upload KB documents"}
               </p>
             </div>
-            
-            {!isAdmin && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => zipInputRef.current?.click()} disabled={uploading}>
-                  <FolderOpen className="mr-2 h-4 w-4" /> Bulk ZIP Upload
-                </Button>
-                <input type="file" ref={zipInputRef} className="hidden" accept=".zip" onChange={handleZipUpload} />
-              </div>
-            )}
           </div>
 
           {!isAdmin && (
@@ -351,14 +329,11 @@ export default function KnowledgeBasePage() {
                     {showCommunityForm && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 space-y-2 overflow-hidden">
                         <Input placeholder="Community Name" value={newCommunityName} onChange={e => setNewCommunityName(e.target.value)} />
-                        <div className="flex gap-2">
-                          <Input type="color" value={newCommunityColor} onChange={e => setNewCommunityColor(e.target.value)} className="w-16 p-1 h-10" />
-                          <Button className="flex-1" onClick={handleCreateCommunity}>Add</Button>
-                        </div>
+                        <Button className="w-full" onClick={handleCreateCommunity}>Add Community</Button>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  
+
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                     {communities.map(c => (
                       <div key={c.id} className="flex items-center justify-between p-2 rounded-md border bg-card hover:bg-muted/50 transition-colors">
@@ -384,35 +359,33 @@ export default function KnowledgeBasePage() {
                 <CardContent>
                   <div className="mb-4">
                     <label className="text-sm font-medium mb-1 block">Select Community</label>
-                    <select 
+                    <select
                       className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       value={selectedCommunityId}
                       onChange={e => setSelectedCommunityId(e.target.value)}
                     >
-                      <option value="">-- Choose Community --</option>
+                      <option value="">Shared / Common (All Communities)</option>
                       {communities.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
-                  
-                  <div 
+
+                  <div
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                     onClick={() => {
-                      if (!selectedCommunityId) return showToast("error", "Select a community first");
                       fileInputRef.current?.click();
                     }}
-                    className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
-                      isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                    }`}
+                    className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                      }`}
                   >
                     <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
                     <h3 className="font-medium text-lg mb-1">Drag & Drop files here</h3>
                     <p className="text-sm text-muted-foreground mb-4">or click to browse (PDF/DOCX max 10MB)</p>
-                    
+
                     {uploading && (
                       <div className="flex items-center justify-center text-primary text-sm font-medium">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading... {uploadProgress}%
@@ -424,7 +397,8 @@ export default function KnowledgeBasePage() {
                     ref={fileInputRef}
                     className="hidden"
                     accept=".pdf,.docx"
-                    onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }}
+                    multiple
+                    onChange={e => { if (e.target.files) handleMultipleFilesUpload(e.target.files); }}
                     disabled={uploading}
                   />
                 </CardContent>
@@ -484,14 +458,24 @@ export default function KnowledgeBasePage() {
                                   {doc.community.name}
                                 </Badge>
                               ) : (
-                                <span className="text-xs text-muted-foreground">None</span>
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                                  Shared / Common
+                                </Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-muted-foreground text-sm">{doc.size}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">{doc.uploaded}</TableCell>
                             {!isAdmin && (
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(doc.id, doc.name)} className="text-red-600 h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setDeleteConfirmId(doc.id);
+                                    setDeleteConfirmName(doc.name);
+                                  }}
+                                  className="text-red-600 h-8 w-8 p-0"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TableCell>
@@ -506,6 +490,35 @@ export default function KnowledgeBasePage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Delete Document Confirmation Dialog */}
+        <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+          <DialogContent className="sm:max-w-md bg-card border border-border shadow-xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-foreground">Delete Document</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-2">
+                Are you sure you want to delete <span className="font-semibold text-foreground">{deleteConfirmName}</span>? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4 gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700 text-white font-medium"
+                onClick={() => {
+                  if (deleteConfirmId) {
+                    handleDeleteDocument(deleteConfirmId, deleteConfirmName);
+                    setDeleteConfirmId(null);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </PortalLayout>
     </ProtectedRoute>
   );

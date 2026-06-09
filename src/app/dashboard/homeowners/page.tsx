@@ -30,10 +30,7 @@ import {
   UserPlus,
   Trash2,
   Mail,
-  Lock,
   User,
-  Eye,
-  EyeOff,
   Copy,
   CheckCircle,
   Home,
@@ -57,13 +54,15 @@ export default function HomeownersManagementPage() {
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Delete Confirmation State
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const [newHomeowner, setNewHomeowner] = useState({
     name: "",
     email: "",
-    password: "",
   });
 
   // Redirect if not admin or staff
@@ -97,12 +96,8 @@ export default function HomeownersManagementPage() {
     e.preventDefault();
     setFormError("");
 
-    if (!newHomeowner.name.trim() || !newHomeowner.email.trim() || !newHomeowner.password.trim()) {
-      setFormError("All fields are required");
-      return;
-    }
-    if (newHomeowner.password.length < 8) {
-      setFormError("Password must be at least 8 characters");
+    if (!newHomeowner.name.trim() || !newHomeowner.email.trim()) {
+      setFormError("Name and Email are required");
       return;
     }
 
@@ -115,8 +110,8 @@ export default function HomeownersManagementPage() {
       const data = await res.json();
       if (!res.ok) { setFormError(data.message || "Failed to create homeowner"); return; }
 
-      setSuccess(`Homeowner account for ${newHomeowner.name} created successfully!`);
-      setNewHomeowner({ name: "", email: "", password: "" });
+      setSuccess(`Homeowner ${newHomeowner.name} added successfully!`);
+      setNewHomeowner({ name: "", email: "" });
       setIsDialogOpen(false);
       fetchHomeowners();
       setTimeout(() => setSuccess(""), 4000);
@@ -126,8 +121,6 @@ export default function HomeownersManagementPage() {
   };
 
   const handleDeleteHomeowner = async (homeownerId: string, homeownerName: string) => {
-    if (!confirm(`Are you sure you want to remove ${homeownerName}? This action cannot be undone.`)) return;
-
     try {
       const res = await fetch("/api/homeowners", {
         method: "DELETE",
@@ -135,7 +128,7 @@ export default function HomeownersManagementPage() {
         body: JSON.stringify({ homeownerId }),
       });
       if (!res.ok) throw new Error("Failed to remove homeowner");
-      setSuccess(`${homeownerName}'s account has been removed.`);
+      setSuccess(`${homeownerName} has been removed.`);
       fetchHomeowners();
       setTimeout(() => setSuccess(""), 4000);
     } catch {
@@ -169,7 +162,7 @@ export default function HomeownersManagementPage() {
               </span>
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage homeowners. You can create or remove homeowner accounts.
+              Manage homeowners. You can register or remove homeowners.
             </p>
           </div>
 
@@ -184,7 +177,7 @@ export default function HomeownersManagementPage() {
               <DialogHeader>
                 <DialogTitle>Add Homeowner</DialogTitle>
                 <DialogDescription>
-                  Create login credentials for a new homeowner.
+                  Register a homeowner name and email address for Botpress verification.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateHomeowner} className="space-y-4 mt-2">
@@ -220,33 +213,12 @@ export default function HomeownersManagementPage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Temporary Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Min. 8 characters"
-                      className="pl-9 pr-10"
-                      value={newHomeowner.password}
-                      onChange={(e) => setNewHomeowner({ ...newHomeowner, password: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button type="submit" className="bg-[#0F3B3D] hover:bg-[#0F3B3D]/90">
-                    Create Account
+                    Add Homeowner
                   </Button>
                 </DialogFooter>
               </form>
@@ -331,7 +303,10 @@ export default function HomeownersManagementPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteHomeowner(homeowner.id, homeowner.name)}
+                          onClick={() => {
+                            setDeleteConfirmId(homeowner.id);
+                            setDeleteConfirmName(homeowner.name);
+                          }}
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -346,6 +321,35 @@ export default function HomeownersManagementPage() {
         </Card>
       </motion.div>
     </div>
+
+    {/* Delete Homeowner Confirmation Dialog */}
+    <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+      <DialogContent className="sm:max-w-md bg-card border border-border shadow-xl">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold text-foreground">Remove Homeowner</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
+            Are you sure you want to remove <span className="font-semibold text-foreground">{deleteConfirmName}</span>? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4 gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            className="bg-red-600 hover:bg-red-700 text-white font-medium"
+            onClick={() => {
+              if (deleteConfirmId) {
+                handleDeleteHomeowner(deleteConfirmId, deleteConfirmName);
+                setDeleteConfirmId(null);
+              }
+            }}
+          >
+            Remove
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </PortalLayout>
   );
 }

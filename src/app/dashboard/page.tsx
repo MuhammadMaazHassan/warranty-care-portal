@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import CountUp from "react-countup";
 import PortalLayout from "@/components/layout/PortalLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,14 +55,24 @@ interface KPIs {
   tokenLimit: number;
 }
 
+type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ESCALATED";
+type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
 interface Ticket {
   id: string;
-  homeowner: string;
-  address: string;
+  homeowner?: {
+    name: string;
+    email: string;
+  };
+  property?: {
+    address: string;
+  };
   issueType: string;
-  status: string;
-  priority: string;
+  ticketType?: string;
+  status: TicketStatus;
+  priority: TicketPriority;
   createdAt: string;
+  warrantyYear: number;
 }
 
 const statusColors: Record<string, string> = {
@@ -68,6 +80,56 @@ const statusColors: Record<string, string> = {
   IN_PROGRESS: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   RESOLVED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   ESCALATED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+
+const statusStyles: Record<TicketStatus, { bg: string, text: string, border: string, dot: string }> = {
+  OPEN: {
+    bg: "bg-sky-50 dark:bg-sky-950/20",
+    text: "text-sky-700 dark:text-sky-400",
+    border: "border-sky-200 dark:border-sky-900/50",
+    dot: "bg-sky-500",
+  },
+  IN_PROGRESS: {
+    bg: "bg-amber-50 dark:bg-amber-950/20",
+    text: "text-amber-700 dark:text-amber-400",
+    border: "border-amber-200 dark:border-amber-900/50",
+    dot: "bg-amber-500",
+  },
+  RESOLVED: {
+    bg: "bg-emerald-50 dark:bg-emerald-950/20",
+    text: "text-emerald-700 dark:text-emerald-400",
+    border: "border-emerald-200 dark:border-emerald-900/50",
+    dot: "bg-emerald-500",
+  },
+  ESCALATED: {
+    bg: "bg-rose-50 dark:bg-rose-950/20",
+    text: "text-rose-700 dark:text-rose-400",
+    border: "border-rose-200 dark:border-rose-900/50",
+    dot: "bg-rose-500",
+  },
+};
+
+const priorityStyles: Record<TicketPriority, { bg: string, text: string, border: string }> = {
+  LOW: {
+    bg: "bg-slate-50 dark:bg-slate-900/20",
+    text: "text-slate-600 dark:text-slate-400",
+    border: "border-slate-200 dark:border-slate-800/50",
+  },
+  MEDIUM: {
+    bg: "bg-indigo-50 dark:bg-indigo-950/20",
+    text: "text-indigo-600 dark:text-indigo-400",
+    border: "border-indigo-200 dark:border-indigo-900/50",
+  },
+  HIGH: {
+    bg: "bg-orange-50 dark:bg-orange-950/20",
+    text: "text-orange-700 dark:text-orange-400",
+    border: "border-orange-200 dark:border-orange-900/50",
+  },
+  URGENT: {
+    bg: "bg-rose-50 dark:bg-rose-950/20",
+    text: "text-rose-700 dark:text-rose-400",
+    border: "border-rose-200 dark:border-rose-900/50",
+  },
 };
 
 const CircularProgress = ({ value = 0, max = 100, size = 50, strokeWidth = 5, color = "#b48c3c" }) => {
@@ -112,6 +174,7 @@ const staggerContainer = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const isHomeowner = user?.role === "homeowner";
 
   const [period, setPeriod] = useState<Period>("7d");
@@ -119,6 +182,12 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [systemHealth, setSystemHealth] = useState({
+    agentStatus: "Operational",
+    erpSync: "Connected to Builtopia",
+    kbDocs: "Active Documents Scoped",
+    lastEscalation: "2 hours ago · resolved by staff"
+  });
 
   // Fetch Stats (Admin/Staff only)
   const fetchAdminStats = async (p: Period) => {
@@ -137,15 +206,10 @@ export default function DashboardPage() {
           tokenConsumption: data.tokenConsumption,
           tokenLimit: 20000,
         });
-        setTickets(data.recentTickets.map((t: any) => ({
-          id: t.id,
-          homeowner: t.homeowner,
-          address: t.address || "N/A",
-          issueType: t.issue,
-          status: t.status,
-          priority: t.priority || "MEDIUM",
-          createdAt: t.date,
-        })));
+        setTickets(data.recentTickets);
+        if (data.systemHealth) {
+          setSystemHealth(data.systemHealth);
+        }
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -163,11 +227,13 @@ export default function DashboardPage() {
         const data = await response.json();
         setTickets(data.map((t: any) => ({
           id: t.id,
-          homeowner: t.homeowner?.name || user?.name || "Me",
-          address: t.property?.address || "N/A",
+          homeowner: { name: t.homeowner?.name || user?.name || "Me", email: t.homeowner?.email || "" },
+          property: t.property ? { address: t.property.address } : null,
           issueType: t.issueType,
-          status: t.status,
+          ticketType: t.ticketType || null,
+          warrantyYear: t.warrantyYear || 1,
           priority: t.priority || "MEDIUM",
+          status: t.status,
           createdAt: t.createdAt,
         })));
       }
@@ -262,31 +328,31 @@ export default function DashboardPage() {
             <motion.div variants={fadeInUp} className="grid gap-4 grid-cols-1 sm:grid-cols-3">
               <Card className="hover:shadow-md transition-all">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-500">My Properties</CardTitle>
-                  <Building2 className="h-4 w-4 text-[#0F3B3D]" />
+                  <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">My Properties</CardTitle>
+                  <Building2 className="h-4 w-4 text-[#0F3B3D] dark:text-[#a0c5c7]" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-[#0F3B3D]">{homeownerStats.totalProperties}</div>
+                  <div className="text-2xl font-bold text-[#0F3B3D] dark:text-slate-100">{homeownerStats.totalProperties}</div>
                   <p className="text-xs text-muted-foreground mt-1">Properties registered to you</p>
                 </CardContent>
               </Card>
               <Card className="hover:shadow-md transition-all">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-500">Active Claims</CardTitle>
+                  <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">Active Claims</CardTitle>
                   <AlertCircle className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-[#0F3B3D]">{homeownerStats.activeClaims}</div>
+                  <div className="text-2xl font-bold text-[#0F3B3D] dark:text-slate-100">{homeownerStats.activeClaims}</div>
                   <p className="text-xs text-muted-foreground mt-1">Pending maintenance issues</p>
                 </CardContent>
               </Card>
               <Card className="hover:shadow-md transition-all">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-500">Resolved Claims</CardTitle>
+                  <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">Resolved Claims</CardTitle>
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-[#0F3B3D]">{homeownerStats.resolvedClaims}</div>
+                  <div className="text-2xl font-bold text-[#0F3B3D] dark:text-slate-100">{homeownerStats.resolvedClaims}</div>
                   <p className="text-xs text-muted-foreground mt-1">Fully resolved issues</p>
                 </CardContent>
               </Card>
@@ -298,7 +364,7 @@ export default function DashboardPage() {
               <div className="lg:col-span-2 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg font-bold text-[#0F3B3D]">My Registered Properties</CardTitle>
+                    <CardTitle className="text-lg font-bold text-[#0F3B3D] dark:text-slate-100">My Registered Properties</CardTitle>
                     <CardDescription>Your registered properties under builder warranty coverage.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -306,30 +372,30 @@ export default function DashboardPage() {
                       user.properties.map((prop) => {
                         const year = getWarrantyYear(prop.coeDate);
                         return (
-                          <div key={prop.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-2xl bg-gray-50/50 hover:bg-gray-50 transition gap-4">
+                          <div key={prop.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/40 hover:bg-gray-50 dark:hover:bg-slate-900/60 transition gap-4">
                             <div className="flex items-start gap-3.5">
-                              <div className="bg-[#0F3B3D]/10 p-2.5 rounded-xl text-[#0F3B3D] mt-0.5">
+                              <div className="bg-[#0F3B3D]/10 dark:bg-[#0f3b3d]/30 p-2.5 rounded-xl text-[#0F3B3D] dark:text-[#a0c5c7] mt-0.5">
                                 <Building2 className="h-5 w-5" />
                               </div>
                               <div>
-                                <p className="font-semibold text-gray-800">{prop.address}</p>
-                                <p className="text-sm text-gray-500">{prop.city || ""}, {prop.state || ""} {prop.zipCode || ""}</p>
+                                <p className="font-semibold text-gray-800 dark:text-slate-100">{prop.address}</p>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">{prop.city || ""}, {prop.state || ""} {prop.zipCode || ""}</p>
                                 {prop.coeDate && (
-                                  <p className="text-xs text-gray-400 mt-1">
+                                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                                     Closing Date: {new Date(prop.coeDate).toLocaleDateString()}
                                   </p>
                                 )}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 self-start sm:self-center">
-                              <Badge className="bg-[#0F3B3D] text-white">Year {year} Coverage</Badge>
+                              <Badge className="bg-[#0F3B3D] dark:bg-[#b48c3c] text-white">Year {year} Coverage</Badge>
                             </div>
                           </div>
                         );
                       })
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <Building2 className="h-12 w-12 mx-auto mb-2 opacity-30 text-[#0F3B3D]" />
+                        <Building2 className="h-12 w-12 mx-auto mb-2 opacity-30 text-[#0F3B3D] dark:text-[#a0c5c7]" />
                         <p className="text-sm">No properties registered under your account yet.</p>
                       </div>
                     )}
@@ -339,17 +405,17 @@ export default function DashboardPage() {
 
               {/* Quick Actions (1/3 width) */}
               <div className="space-y-6">
-                <Card className="bg-[#0F3B3D]/5 border-t-4 border-t-[#0F3B3D]">
+                <Card className="bg-[#0F3B3D]/5 dark:bg-[#0F3B3D]/10 border-t-4 border-t-[#0F3B3D] dark:border-t-[#a0c5c7]">
                   <CardHeader>
-                    <CardTitle className="text-md font-bold text-[#0F3B3D]">Instant AI Handoff</CardTitle>
+                    <CardTitle className="text-md font-bold text-[#0F3B3D] dark:text-slate-100">Instant AI Handoff</CardTitle>
                     <CardDescription>Get diagnostic self-fixes or escalate instantly to our builders.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-sm text-gray-600 bg-white p-4 rounded-xl border border-gray-100 shadow-xs leading-relaxed">
+                    <div className="text-sm text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-950 p-4 rounded-xl border border-gray-100 dark:border-slate-800/80 shadow-xs leading-relaxed">
                       "I can help you troubleshoot plumbing, electrical, or structural issues. If an issue is covered, I will automatically file a ticket for you!"
                     </div>
                     <Link href="/chat" className="block w-full">
-                      <Button className="w-full bg-[#0F3B3D] hover:bg-[#0F3B3D]/90 text-white font-semibold">
+                      <Button className="w-full bg-[#0F3B3D] hover:bg-[#0F3B3D]/90 dark:bg-[#b48c3c] dark:hover:bg-[#b48c3c]/90 text-white font-semibold border-none cursor-pointer">
                         Launch AI Assistant
                       </Button>
                     </Link>
@@ -363,11 +429,11 @@ export default function DashboardPage() {
               <Card className="overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg font-bold text-[#0F3B3D]">My Recent Claims</CardTitle>
+                    <CardTitle className="text-lg font-bold text-[#0F3B3D] dark:text-slate-100">My Recent Claims</CardTitle>
                     <p className="text-sm text-muted-foreground">Detailed status of your submitted warranty requests</p>
                   </div>
                   <Link href="/tickets">
-                    <Button variant="ghost" size="sm" className="text-[#0F3B3D] hover:bg-[#0F3B3D]/10">
+                    <Button variant="ghost" size="sm" className="text-[#0F3B3D] dark:text-[#a0c5c7] hover:bg-[#0F3B3D]/10 dark:hover:bg-[#0F3B3D]/20">
                       View All
                     </Button>
                   </Link>
@@ -390,14 +456,14 @@ export default function DashboardPage() {
                       <TableBody>
                         {tickets.slice(0, 5).map((ticket) => (
                           <TableRow key={ticket.id}>
-                            <TableCell className="font-semibold text-xs text-gray-500">{ticket.id}</TableCell>
-                            <TableCell className="font-medium text-gray-700">{ticket.issueType}</TableCell>
-                            <TableCell className="text-gray-500">{ticket.address}</TableCell>
+                            <TableCell className="font-semibold text-xs text-gray-500 dark:text-slate-400">{ticket.id}</TableCell>
+                            <TableCell className="font-medium text-gray-700 dark:text-slate-200">{ticket.issueType}</TableCell>
+                            <TableCell className="text-gray-500 dark:text-slate-400">{ticket.property?.address}</TableCell>
                             <TableCell><Badge variant="outline" className="capitalize text-xs">{ticket.priority.toLowerCase()}</Badge></TableCell>
                             <TableCell><Badge className={statusColors[ticket.status]}>{ticket.status.replace("_", " ")}</Badge></TableCell>
                             <TableCell className="text-right">
                               <Link href={`/tickets/${ticket.id}`}>
-                                <Button variant="ghost" size="sm" className="text-[#0F3B3D] hover:bg-[#0F3B3D]/10">
+                                <Button variant="ghost" size="sm" className="text-[#0F3B3D] dark:text-[#a0c5c7] hover:bg-[#0F3B3D]/10 dark:hover:bg-[#0F3B3D]/20">
                                   View
                                 </Button>
                               </Link>
@@ -407,10 +473,10 @@ export default function DashboardPage() {
                       </TableBody>
                     </Table>
                   ) : (
-                    <div className="text-center py-12 text-gray-400">
-                      <TicketCheck className="h-12 w-12 mx-auto opacity-20 text-[#0F3B3D] mb-2" />
+                    <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+                      <TicketCheck className="h-12 w-12 mx-auto opacity-20 text-[#0F3B3D] dark:text-[#a0c5c7] mb-2" />
                       <p className="text-sm font-medium">You haven't filed any warranty claims yet.</p>
-                      <Link href="/chat" className="text-xs text-[#0F3B3D] underline mt-1 block">
+                      <Link href="/chat" className="text-xs text-[#0F3B3D] dark:text-[#a0c5c7] underline mt-1 block">
                         Ask the AI assistant to file a claim for you!
                       </Link>
                     </div>
@@ -519,7 +585,7 @@ export default function DashboardPage() {
                         <div className="text-2xl font-bold">
                           <CountUp key={`rate-${period}`} end={kpis.autoResolutionRate} duration={1.5} suffix="%" />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Target: 60% (Phase 1)</p>
+                        <p className="text-xs text-muted-foreground mt-1">Target: 60%</p>
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -531,7 +597,7 @@ export default function DashboardPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          <CountUp key={`time-${period}`} end={parseFloat(kpis.avgResolutionTime)} duration={1.5} decimals={1} suffix=" days" />
+                          {kpis.avgResolutionTime}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           Tokens: {kpis.tokenConsumption.toLocaleString()} / {kpis.tokenLimit.toLocaleString()}
@@ -551,31 +617,62 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground">Latest warranty claims for {getPeriodLabel(period)}</p>
                 </CardHeader>
                 <CardContent className="p-0 overflow-x-auto">
-                  <Table className="min-w-[800px] md:min-w-full">
-                    <TableHeader>
+                  <Table className="min-w-[900px] border-collapse">
+                    <TableHeader className="bg-muted/15 border-b border-border/50">
                       <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Homeowner</TableHead>
-                        <TableHead className="hidden sm:table-cell">Address</TableHead>
-                        <TableHead>Issue</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="hidden md:table-cell">Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3 pl-6">ID</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Homeowner</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Address</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Issue</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Type</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Year</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Priority</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Status</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3 pr-6">Created</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {tickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                          <TableCell className="font-medium">{ticket.id}</TableCell>
-                          <TableCell>{ticket.homeowner}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{ticket.address}</TableCell>
-                          <TableCell>{ticket.issueType}</TableCell>
-                          <TableCell><Badge variant="outline" className="capitalize">{ticket.priority.toLowerCase()}</Badge></TableCell>
-                          <TableCell><Badge className={statusColors[ticket.status]}>{ticket.status.replace("_", " ")}</Badge></TableCell>
-                          <TableCell className="hidden md:table-cell">{new Date(ticket.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-right">
-                            <Link href={`/tickets/${ticket.id}`}><Button variant="ghost" size="sm">View</Button></Link>
+                        <TableRow
+                          key={ticket.id}
+                          onClick={() => router.push(`/tickets/${ticket.id}`)}
+                          className="border-b border-border/30 hover:bg-muted/15 transition-colors group cursor-pointer"
+                        >
+                          <TableCell className="py-3.5 pl-6">
+                            <span className="font-mono text-[11px] font-semibold text-foreground bg-primary/10 px-2 py-1 rounded border border-primary/20 group-hover:bg-primary/15 transition-all" title={ticket.id}>
+                              {ticket.id.startsWith("T-") ? ticket.id : `${ticket.id.substring(0, 8)}...`}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-3.5 font-medium text-foreground text-sm">
+                            {ticket.homeowner?.name || "Unknown"}
+                          </TableCell>
+                          <TableCell className="py-3.5 text-muted-foreground text-xs max-w-[200px] truncate" title={ticket.property?.address}>
+                            {ticket.property?.address || <span className="text-muted-foreground/50 italic">No address linked</span>}
+                          </TableCell>
+                          <TableCell className="py-3.5 text-foreground/90 font-medium text-xs max-w-[220px] truncate" title={ticket.issueType}>
+                            {ticket.issueType}
+                          </TableCell>
+                          <TableCell className="py-3.5 text-muted-foreground text-xs uppercase">
+                            {ticket.ticketType || "-"}
+                          </TableCell>
+                          <TableCell className="py-3.5 text-muted-foreground text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[10px] font-semibold text-muted-foreground border border-border/50">
+                              Year {ticket.warrantyYear}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-3.5">
+                            <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-semibold border shadow-2xs", priorityStyles[ticket.priority as TicketPriority].bg, priorityStyles[ticket.priority as TicketPriority].text, priorityStyles[ticket.priority as TicketPriority].border)}>
+                              {ticket.priority}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3.5">
+                            <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-semibold border flex items-center gap-1.5 shadow-2xs w-fit", statusStyles[ticket.status as TicketStatus].bg, statusStyles[ticket.status as TicketStatus].text, statusStyles[ticket.status as TicketStatus].border)}>
+                              <span className={cn("h-1.5 w-1.5 rounded-full", statusStyles[ticket.status as TicketStatus].dot)} />
+                              {ticket.status.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3.5 text-muted-foreground text-xs pr-6">
+                            {new Date(ticket.createdAt).toLocaleDateString()}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -594,10 +691,24 @@ export default function DashboardPage() {
                 <CardHeader><CardTitle className="flex gap-2"><Activity className="h-5 w-5" /> System Health</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <div><p className="text-sm text-muted-foreground">Agent Status</p><p className="font-medium text-green-600">✓ Operational (Phase 1)</p></div>
-                    <div><p className="text-sm text-muted-foreground">ERP Sync</p><p className="font-medium text-green-600">✓ Connected to Builtopia</p></div>
-                    <div><p className="text-sm text-muted-foreground">Knowledge Base Docs</p><p className="font-medium">Active Documents Scoped</p></div>
-                    <div><p className="text-sm text-muted-foreground">Last Escalation</p><p className="font-medium">2 hours ago · resolved by staff</p></div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Agent Status</p>
+                      <p className="font-medium text-green-600">✓ {systemHealth.agentStatus}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">ERP Sync</p>
+                      <p className={`font-medium ${systemHealth.erpSync !== "Not Connected" ? "text-green-600" : "text-red-500"}`}>
+                        {systemHealth.erpSync !== "Not Connected" ? "✓ " : "✗ "}{systemHealth.erpSync}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Knowledge Base Docs</p>
+                      <p className="font-medium">{systemHealth.kbDocs}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Last Escalation</p>
+                      <p className="font-medium">{systemHealth.lastEscalation}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

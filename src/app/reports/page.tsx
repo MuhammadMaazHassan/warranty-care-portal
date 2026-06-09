@@ -111,7 +111,6 @@ export default function ReportsPage() {
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [isLive, setIsLive] = useState(false);
-  const [countdown, setCountdown] = useState(10);
   const [metrics, setMetrics] = useState<Metrics>({
     autoResolutionRate: 0,
     avgResponseTime: 0,
@@ -171,22 +170,6 @@ export default function ReportsPage() {
   useEffect(() => {
     fetchReportsData(period, startDate, endDate);
   }, [period, startDate, endDate, fetchReportsData]);
-
-  // Live polling effect
-  useEffect(() => {
-    if (!isLive) return;
-    setCountdown(10);
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          fetchReportsData(period, startDate, endDate, true);
-          return 10;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isLive, period, startDate, endDate, fetchReportsData]);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMessage({ type, text });
@@ -315,7 +298,7 @@ export default function ReportsPage() {
                     <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                   </span>
                   <span className="text-[11px] font-semibold text-muted-foreground">
-                    {isLive ? `Live Sync (${countdown}s)` : "Real-time Mode"}
+                    {isLive ? `Live Sync` : "Real-time Mode"}
                   </span>
                 </div>
                 <button

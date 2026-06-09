@@ -16,17 +16,13 @@ import {
   EyeOff,
   CheckCircle,
   Sparkles,
-  CheckCircle2,
   Wrench,
-  User,
   Home,
   ArrowRight,
-  KeyRound,
   Activity,
-  TrendingUp,
   UserCheck,
   Building,
-  Clock
+  Phone
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -498,14 +494,17 @@ function AuthContainer() {
                         <div className="space-y-1.5">
                           <Label htmlFor="companyPhone" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Company Phone</Label>
                           <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 transition-colors group-focus-within:text-[#c59b4c]" />
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 transition-colors group-focus-within:text-[#c59b4c]" />
                             <Input
                               id="companyPhone"
                               type="text"
                               placeholder="(555) 123-4567"
                               className="pl-12 pr-4 h-12 w-full bg-white/2 border border-white/10 hover:bg-white/10 text-zinc-100 placeholder-zinc-600 rounded-xl focus:border-[#c59b4c]/60 focus:ring-1 focus:ring-[#c59b4c]/20 focus:bg-white/20 transition-all duration-200 focus:outline-none text-sm"
                               value={companyPhone}
-                              onChange={(e) => setCompanyPhone(e.target.value)}
+                              onChange={(e) => {
+                                const sanitized = e.target.value.replace(/[^0-9+\-()\s]/g, "");
+                                setCompanyPhone(sanitized);
+                              }}
                               disabled={isLoading}
                             />
                           </div>
