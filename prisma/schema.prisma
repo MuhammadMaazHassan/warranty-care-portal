@@ -27,36 +27,42 @@ enum TicketPriority {
 }
 
 model User {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  password        String
-  name            String?
-  avatar          String?   // Personal avatar for staff members
-  role            Role      @default(HOMEOWNER)
-  companyId       String?
-  company         Company?  @relation(fields: [companyId], references: [id])
-  properties      Property[]
-  tickets         Ticket[]  @relation("HomeownerTickets")
-  knowledgeBaseId String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String
+  name              String?
+  avatar            String?            // Personal avatar for staff members
+  role              Role               @default(HOMEOWNER)
+  companyId         String?
+  company           Company?           @relation(fields: [companyId], references: [id])
+  properties        Property[]
+  tickets           Ticket[]           @relation("HomeownerTickets")
+  knowledgeBaseId   String?
+  hasWarrantyAccess Boolean            @default(true)
+  hasSalesAccess    Boolean            @default(false)
+  ownedLeads        Lead[]             @relation("LeadOwner")
+  agentAppointments SalesAppointment[] @relation("AgentAppointments")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Company {
-  id              String               @id @default(cuid())
+  id              String                  @id @default(cuid())
   name            String
   logo            String?
   email           String?
   phone           String?
   address         String?
-  warrantyPolicy  String?              @db.Text
-  botColor        String?              @default("#0F3B3D")
+  warrantyPolicy  String?                 @db.Text
+  botColor        String?                 @default("#0F3B3D")
   users           User[]
   knowledgeBase   KnowledgeBaseDocument[]
   integrations    Integration[]
   communities     Community[]
+  leads           Lead[]
+  segments        LeadSegment[]
   knowledgeBaseId String?
-  createdAt       DateTime             @default(now())
+  createdAt       DateTime                @default(now())
   updatedAt       DateTime             @updatedAt
 }
 
@@ -136,3 +142,72 @@ model KnowledgeBaseDocument {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
+
+enum LeadSource {
+  SALESFORCE
+  CSV
+  MANUAL
+}
+
+model Lead {
+  id                String             @id @default(cuid())
+  companyId         String
+  company           Company            @relation(fields: [companyId], references: [id])
+  source            LeadSource         @default(MANUAL)
+  externalId        String?            // CRM Record ID
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  street            String?
+  city              String?
+  state             String?
+  zipCode           String?
+  status            String             @default("New")
+  ownerId           String?
+  owner             User?              @relation("LeadOwner", fields: [ownerId], references: [id])
+  tags              String[]           @default([])
+  emailOptIn        Boolean            @default(false)
+  smsOptIn          Boolean            @default(false)
+  consentSource     String?
+  consentTimestamp  DateTime?
+  customFields      Json?              // Custom metadata (key-value)
+  timeline          LeadTimeline[]
+  appointments      SalesAppointment[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model LeadTimeline {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String   // EMAIL_SENT, SMS_SENT, REPLY_RECEIVED, APPOINTMENT_SET, STATUS_CHANGE, CONSENT_CHANGE, SYNC_UPDATE, IMPORT
+  description String   @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+}
+
+model LeadSegment {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  filters   Json     // Dynamic JSON rules
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SalesAppointment {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  title     String
+  time      DateTime
+  status    String   @default("CONFIRMED") // CONFIRMED, PENDING, CANCELLED
+  agentId   String
+  agent     User     @relation("AgentAppointments", fields: [agentId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

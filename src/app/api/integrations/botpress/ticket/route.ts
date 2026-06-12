@@ -53,9 +53,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Resolve ticket priority
-    let ticketPriority = priority || "MEDIUM";
-    if (isEmergency) {
+    // 3. Resolve ticket priority & normalize boolean
+    const emergencyBool = typeof isEmergency === "string" ? isEmergency.toLowerCase() === "true" : !!isEmergency;
+    
+    let ticketPriority = String(priority || "MEDIUM").toUpperCase();
+    if (!["LOW", "MEDIUM", "HIGH", "URGENT"].includes(ticketPriority)) {
+      ticketPriority = "MEDIUM";
+    }
+    
+    if (emergencyBool) {
       ticketPriority = "URGENT";
     }
 
@@ -73,8 +79,8 @@ export async function POST(request: Request) {
         kbReferences: kbReferences && Array.isArray(kbReferences) && kbReferences.length > 0 ? JSON.stringify(kbReferences) : null,
         propertyId: selectedPropertyId || null,
         homeownerId: homeowner.id,
-        isEmergency,
-        priority: ticketPriority,
+        isEmergency: emergencyBool,
+        priority: ticketPriority as any,
         warrantyYear,
         erpSyncStatus: "PENDING"
       }

@@ -278,7 +278,7 @@ export default function TicketDetail() {
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Ticket Not Found</h2>
         <p className="text-slate-500 dark:text-slate-400 mt-2">The ticket details could not be retrieved, or you do not have permission to view them.</p>
-        <Link href="/tickets">
+        <Link href="/warranty/tickets">
           <Button className="mt-6 bg-[#0F3B3D] hover:bg-[#0F3B3D]/90 text-white rounded-xl px-6">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to Tickets
           </Button>
@@ -298,7 +298,7 @@ export default function TicketDetail() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-slate-800/60 pb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Link href="/tickets">
+                <Link href="/warranty/tickets">
                   <Button variant="outline" size="icon" className="rounded-full h-9 w-9 border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:bg-slate-100 dark:hover:bg-slate-800/50 transition">
                     <ArrowLeft className="h-4 w-4" />
                   </Button>

@@ -374,7 +374,7 @@ export default function PropertiesPage() {
                           </div>
                           <div className="flex items-center justify-between pt-1">
                             <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">Have an issue with this property?</span>
-                            <Link href="/tickets">
+                            <Link href="/warranty/tickets">
                               <Button size="sm" variant="outline" className="text-[#0F3B3D] border-[#0F3B3D] hover:bg-[#0F3B3D] hover:text-white dark:text-[#a0c5c7] dark:border-[#a0c5c7] dark:hover:bg-[#0F3B3D] dark:hover:text-white gap-1 text-xs">
                                 Ask AI <ChevronRight className="h-3 w-3" />
                               </Button>

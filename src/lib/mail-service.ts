@@ -64,7 +64,7 @@ export class MailService {
           </div>
           <p>Our team is working to resolve this as quickly as possible. You can track the progress of your claim in the portal.</p>
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://warranty-portal.bitzsol.com/tickets/${ticketId}" 
+            <a href="https://warranty-portal.bitzsol.com/warranty/tickets/${ticketId}" 
                style="background: #b48c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                View Ticket in Portal
             </a>

@@ -35,6 +35,8 @@ export interface User {
   properties?: Property[];
   online: boolean;
   lastSeen?: Date;
+  hasWarrantyAccess: boolean;
+  hasSalesAccess: boolean;
 }
 
 interface AuthContextType {
@@ -121,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      router.push("/dashboard");
+      router.push("/");
     } catch (err) {
       setIsLoading(false);
       throw err;

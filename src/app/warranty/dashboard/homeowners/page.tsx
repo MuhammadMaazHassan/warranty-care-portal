@@ -68,7 +68,7 @@ export default function HomeownersManagementPage() {
   // Redirect if not admin or staff
   useEffect(() => {
     if (user && user.role !== "admin" && user.role !== "staff") {
-      router.push("/dashboard");
+      router.push("/warranty/dashboard");
     }
   }, [user, router]);
 

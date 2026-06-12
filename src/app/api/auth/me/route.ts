@@ -28,12 +28,19 @@ export async function GET() {
 
     // Admin → company logo as avatar; Staff/Homeowner → their own personal avatar
     const isAdmin = dbUser.role === "ADMIN";
+    const isStaff = dbUser.role === "STAFF";
     const avatarUrl = isAdmin
       ? (dbUser.company?.logo || null)
       : (dbUser.avatar || null);
 
+    // Default ADMIN and STAFF to both workspaces for testing purposes
+    const hasWarrantyAccess = isAdmin || isStaff ? true : dbUser.hasWarrantyAccess;
+    const hasSalesAccess = isAdmin || isStaff ? true : dbUser.hasSalesAccess;
+
     return NextResponse.json({
       ...dbUser,
+      hasWarrantyAccess,
+      hasSalesAccess,
       avatar: avatarUrl,
       companyLogo: dbUser.company?.logo || null, // Always the company logo, for the header
       companyName: dbUser.company?.name || null,

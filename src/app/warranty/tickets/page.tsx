@@ -367,7 +367,7 @@ export default function TicketsPage() {
             <div className="flex gap-2">
               {isHomeowner && (
                 <Button asChild>
-                  <Link href="/tickets/new">
+                  <Link href="/warranty/tickets/new">
                     <Plus className="mr-2 h-4 w-4" />
                     New Ticket
                   </Link>
@@ -520,7 +520,7 @@ export default function TicketsPage() {
                           animate="visible"
                           exit="exit"
                           layout
-                          onClick={() => router.push(`/tickets/${ticket.id}`)}
+                          onClick={() => router.push(`/warranty/tickets/${ticket.id}`)}
                           className="border border-border/80 rounded-xl p-4 space-y-3 bg-background/35 backdrop-blur-xs hover:border-border transition-all cursor-pointer"
                         >
                           <div className="flex justify-between items-start gap-2">
@@ -558,7 +558,7 @@ export default function TicketsPage() {
                           </div>
                           
                           <div className="flex justify-end gap-2 pt-2 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
-                            <Link href={`/tickets/${ticket.id}`} className="w-fit">
+                            <Link href={`/warranty/tickets/${ticket.id}`} className="w-fit">
                               <Button variant="ghost" size="sm" className="h-7 text-xs">
                                 <Eye className="h-3.5 w-3.5 mr-1" />
                                 View
@@ -596,7 +596,7 @@ export default function TicketsPage() {
                               animate="visible"
                               exit="exit"
                               layout
-                              onClick={() => router.push(`/tickets/${ticket.id}`)}
+                              onClick={() => router.push(`/warranty/tickets/${ticket.id}`)}
                               className="border-b border-border/30 hover:bg-muted/15 transition-colors group cursor-pointer"
                             >
                               <TableCell className="py-3.5 pl-6">

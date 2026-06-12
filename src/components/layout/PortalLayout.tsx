@@ -21,10 +21,14 @@ import {
   Moon,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
   Users,
   Pencil,
+  Activity,
   Check,
+  Layers,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -48,20 +52,39 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Camera, Circle } from "lucide-react";
 
-const navItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "staff", "homeowner"] },
-  { name: "AI Assistant", href: "/chat", icon: Bot, roles: ["admin", "staff", "homeowner"] },
-  { name: "Properties", href: "/properties", icon: Building2, roles: ["admin", "staff", "homeowner"] },
-  { name: "Tickets", href: "/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
-  { name: "Team", href: "/dashboard/team", icon: Users, roles: ["admin", "staff"] },
-  { name: "Homeowners", href: "/dashboard/homeowners", icon: User, roles: ["admin", "staff"] },
-  { name: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
-  { name: "Knowledge Base", href: "/knowledge-base", icon: Database, roles: ["admin", "staff"] },
-  { name: "Company", href: "/company", icon: Building2, roles: ["admin", "staff"] },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "staff"] },
+const warrantyNavItems = [
+  { name: "Dashboard", href: "/warranty/dashboard", icon: LayoutDashboard, roles: ["admin", "staff", "homeowner"] },
+  { name: "AI Assistant", href: "/warranty/chat", icon: Bot, roles: ["admin", "staff", "homeowner"] },
+  { name: "Properties", href: "/warranty/properties", icon: Building2, roles: ["admin", "staff", "homeowner"] },
+  { name: "Tickets", href: "/warranty/tickets", icon: Ticket, roles: ["admin", "staff", "homeowner"] },
+  { name: "Team", href: "/warranty/dashboard/team", icon: Users, roles: ["admin", "staff"] },
+  { name: "Homeowners", href: "/warranty/dashboard/homeowners", icon: User, roles: ["admin", "staff"] },
+  { name: "Integrations", href: "/warranty/integrations", icon: Plug, roles: ["admin"] },
+  { name: "Knowledge Base", href: "/warranty/knowledge-base", icon: Database, roles: ["admin", "staff"] },
+  { name: "Company", href: "/warranty/company", icon: Building2, roles: ["admin", "staff"] },
+  { name: "Reports", href: "/warranty/reports", icon: BarChart3, roles: ["admin", "staff"] },
 ];
 
-export default function PortalLayout({ children }: { children: React.ReactNode }) {
+const salesNavItems = [
+  { name: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] },
+  { name: "Leads", href: "/sales/leads", icon: Users, roles: ["admin", "staff"] },
+  { name: "Sequences", href: "/sales/sequences", icon: Layers, roles: ["admin", "staff"] },
+  { name: "Content Calendar", href: "/sales/calendar", icon: CalendarDays, roles: ["admin", "staff"] },
+  { name: "Announcements", href: "/sales/announcements", icon: Bot, roles: ["admin", "staff"] },
+  { name: "Appointments", href: "/sales/scheduling", icon: CalendarDays, roles: ["admin", "staff"] },
+  { name: "News Feed", href: "/sales/news", icon: Activity, roles: ["admin", "staff"] },
+  { name: "Blog Posts", href: "/sales/blog", icon: Pencil, roles: ["admin", "staff"] },
+  { name: "Automations", href: "/sales/automations", icon: Plug, roles: ["admin"] },
+  { name: "Settings", href: "/sales/settings", icon: Building2, roles: ["admin", "staff"] },
+];
+
+export default function PortalLayout({
+  children,
+  workspace = "warranty",
+}: {
+  children: React.ReactNode;
+  workspace?: "warranty" | "sales";
+}) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -75,9 +98,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => setMounted(true), []);
 
+  const navItems = workspace === "warranty" ? warrantyNavItems : salesNavItems;
   const filteredNav = navItems.filter((item) => user && item.roles.includes(user.role));
   const getInitials = (name: string) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase();
+
+  const handleWorkspaceSwitch = (ws: "warranty" | "sales") => {
+    localStorage.setItem("last-workspace", ws);
+    document.cookie = `last-workspace=${ws}; path=/; max-age=31536000; SameSite=Lax`;
+    router.push(`/${ws}/dashboard`);
+  };
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,7 +138,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="flex h-full flex-col">
           {/* Header with logo and toggle */}
           <div className="flex h-16 items-center justify-between px-4">
-            <button onClick={() => router.push("/dashboard")} className="flex items-center gap-3.5 hover:opacity-80 transition">
+            <button onClick={() => router.push(workspace === "warranty" ? "/warranty/dashboard" : "/sales/dashboard")} className="flex items-center gap-3.5 hover:opacity-80 transition">
               <img src={user?.companyLogo || "/logo.png"} alt="Logo" className="h-9 w-auto object-contain rounded-md" />
               {sidebarExpanded && (
                 <span className="text-xl font-bold tracking-tight">{user?.companyName || "Ai.Lumen Care"}</span>
@@ -119,6 +149,41 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             </Button>
           </div>
           <Separator className="bg-white/10" />
+
+          {/* Workspace Switcher */}
+          {user && (user.hasWarrantyAccess || user.hasSalesAccess) && (
+            <div className="px-3 py-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex w-full items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white hover:bg-white/10 transition cursor-pointer outline-hidden">
+                    <div className="flex items-center gap-2 overflow-hidden text-left">
+                      <span className="font-semibold text-[10px] tracking-wider uppercase text-white/40 shrink-0">WS:</span>
+                      <span className="font-medium text-white text-xs truncate">
+                        {workspace === "warranty" ? "Warranty Care" : "Sales Hub"}
+                      </span>
+                    </div>
+                    {sidebarExpanded && <ChevronDown className="h-3.5 w-3.5 text-white/50 shrink-0" />}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuLabel className="text-xs">Switch Workspace</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {user.hasWarrantyAccess && (
+                    <DropdownMenuItem onClick={() => handleWorkspaceSwitch("warranty")} className="flex items-center justify-between text-xs cursor-pointer">
+                      <span>Warranty Care</span>
+                      {workspace === "warranty" && <Check className="h-3.5 w-3.5" />}
+                    </DropdownMenuItem>
+                  )}
+                  {user.hasSalesAccess && (
+                    <DropdownMenuItem onClick={() => handleWorkspaceSwitch("sales")} className="flex items-center justify-between text-xs cursor-pointer">
+                      <span>Sales Hub</span>
+                      {workspace === "sales" && <Check className="h-3.5 w-3.5" />}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
@@ -269,6 +334,42 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     </Button>
                   </div>
                   <Separator className="bg-white/10" />
+
+                  {/* Mobile Workspace Switcher */}
+                  {user && (user.hasWarrantyAccess || user.hasSalesAccess) && (
+                    <div className="px-3 py-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex w-full items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white hover:bg-white/10 transition cursor-pointer outline-hidden">
+                            <div className="flex items-center gap-2 overflow-hidden text-left">
+                              <span className="font-semibold text-[10px] tracking-wider uppercase text-white/40 shrink-0">WS:</span>
+                              <span className="font-medium text-white text-xs truncate">
+                                {workspace === "warranty" ? "Warranty Care" : "Sales Hub"}
+                              </span>
+                            </div>
+                            <ChevronDown className="h-3.5 w-3.5 text-white/50 shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-48">
+                          <DropdownMenuLabel className="text-xs">Switch Workspace</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {user.hasWarrantyAccess && (
+                            <DropdownMenuItem onClick={() => handleWorkspaceSwitch("warranty")} className="flex items-center justify-between text-xs cursor-pointer">
+                              <span>Warranty Care</span>
+                              {workspace === "warranty" && <Check className="h-3.5 w-3.5" />}
+                            </DropdownMenuItem>
+                          )}
+                          {user.hasSalesAccess && (
+                            <DropdownMenuItem onClick={() => handleWorkspaceSwitch("sales")} className="flex items-center justify-between text-xs cursor-pointer">
+                              <span>Sales Hub</span>
+                              {workspace === "sales" && <Check className="h-3.5 w-3.5" />}
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
                   <nav className="flex-1 space-y-1 p-3">
                     {filteredNav.map((item) => (
                       <Link key={item.name} href={item.href} onClick={closeMobileSidebar}>

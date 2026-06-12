@@ -310,12 +310,12 @@ export default function DashboardPage() {
                   Easily view your warranty properties, check outstanding service claims, or instantly chat with our AI Support Assistant for professional help.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
-                  <Link href="/chat">
+                  <Link href="/warranty/chat">
                     <Button className="bg-[#b48c3c] hover:bg-[#b48c3c]/90 text-white gap-2 font-semibold">
                       <Bot className="h-4 w-4" /> Speak with AI
                     </Button>
                   </Link>
-                  <Link href="/tickets">
+                  <Link href="/warranty/tickets">
                     <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2">
                       <Plus className="h-4 w-4" /> File a Claim
                     </Button>
@@ -414,7 +414,7 @@ export default function DashboardPage() {
                     <div className="text-sm text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-950 p-4 rounded-xl border border-gray-100 dark:border-slate-800/80 shadow-xs leading-relaxed">
                       "I can help you troubleshoot plumbing, electrical, or structural issues. If an issue is covered, I will automatically file a ticket for you!"
                     </div>
-                    <Link href="/chat" className="block w-full">
+                    <Link href="/warranty/chat" className="block w-full">
                       <Button className="w-full bg-[#0F3B3D] hover:bg-[#0F3B3D]/90 dark:bg-[#b48c3c] dark:hover:bg-[#b48c3c]/90 text-white font-semibold border-none cursor-pointer">
                         Launch AI Assistant
                       </Button>
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg font-bold text-[#0F3B3D] dark:text-slate-100">My Recent Claims</CardTitle>
                     <p className="text-sm text-muted-foreground">Detailed status of your submitted warranty requests</p>
                   </div>
-                  <Link href="/tickets">
+                  <Link href="/warranty/tickets">
                     <Button variant="ghost" size="sm" className="text-[#0F3B3D] dark:text-[#a0c5c7] hover:bg-[#0F3B3D]/10 dark:hover:bg-[#0F3B3D]/20">
                       View All
                     </Button>
@@ -462,7 +462,7 @@ export default function DashboardPage() {
                             <TableCell><Badge variant="outline" className="capitalize text-xs">{ticket.priority.toLowerCase()}</Badge></TableCell>
                             <TableCell><Badge className={statusColors[ticket.status]}>{ticket.status.replace("_", " ")}</Badge></TableCell>
                             <TableCell className="text-right">
-                              <Link href={`/tickets/${ticket.id}`}>
+                              <Link href={`/warranty/tickets/${ticket.id}`}>
                                 <Button variant="ghost" size="sm" className="text-[#0F3B3D] dark:text-[#a0c5c7] hover:bg-[#0F3B3D]/10 dark:hover:bg-[#0F3B3D]/20">
                                   View
                                 </Button>
@@ -476,7 +476,7 @@ export default function DashboardPage() {
                     <div className="text-center py-12 text-gray-400 dark:text-slate-500">
                       <TicketCheck className="h-12 w-12 mx-auto opacity-20 text-[#0F3B3D] dark:text-[#a0c5c7] mb-2" />
                       <p className="text-sm font-medium">You haven't filed any warranty claims yet.</p>
-                      <Link href="/chat" className="text-xs text-[#0F3B3D] dark:text-[#a0c5c7] underline mt-1 block">
+                      <Link href="/warranty/chat" className="text-xs text-[#0F3B3D] dark:text-[#a0c5c7] underline mt-1 block">
                         Ask the AI assistant to file a claim for you!
                       </Link>
                     </div>
@@ -635,7 +635,7 @@ export default function DashboardPage() {
                       {tickets.map((ticket) => (
                         <TableRow
                           key={ticket.id}
-                          onClick={() => router.push(`/tickets/${ticket.id}`)}
+                          onClick={() => router.push(`/warranty/tickets/${ticket.id}`)}
                           className="border-b border-border/30 hover:bg-muted/15 transition-colors group cursor-pointer"
                         >
                           <TableCell className="py-3.5 pl-6">
@@ -679,7 +679,7 @@ export default function DashboardPage() {
                     </TableBody>
                   </Table>
                   <div className="p-4 text-center">
-                    <Link href="/tickets"><Button variant="outline">View All Tickets <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+                    <Link href="/warranty/tickets"><Button variant="outline">View All Tickets <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
                   </div>
                 </CardContent>
               </Card>
