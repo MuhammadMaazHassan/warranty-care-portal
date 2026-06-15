@@ -96,8 +96,8 @@
 - [x] **Sales Dashboard (SW-DSH-001 - SW-DSH-002)**: Build initial dashboard displaying lead statistics, sync status, and exportable CSV reporting views.
 
 ### 📅 Phase 4: Integrations, Nurturing & Compliance
-- [ ] **Salesforce v1 Connector (SW-CRM-001 - SW-CRM-009)**: Implement OAuth 2.0 connection management, field mapping config UI, Bulk API initial import, incremental sync cron jobs (Inngest), write-back logs, and consent mapping.
-- [ ] **Central Compliance Layer (SW-NUR-006, NFR-S-005)**: Build centralized checks for SMS quiet hours, opt-in/opt-out status, suppression lists, and auto STOP/HELP handler hook.
+- [x] **Salesforce v1 Connector (SW-CRM-001 - SW-CRM-009)**: Implement OAuth 2.0 connection management, field mapping config UI, Bulk API initial import, incremental sync cron jobs (Inngest), write-back logs, and consent mapping.
+- [x] **Central Compliance Layer (SW-NUR-006, NFR-S-005)**: Build centralized checks for SMS quiet hours, opt-in/opt-out status, suppression lists, and auto STOP/HELP handler hook.
 - [ ] **Lead Nurturing Sequences (SW-NUR-001 - SW-NUR-008)**: Develop sequence builder (1-50 steps, delay logic, send windows), automated enrollment triggers, webhook reply detection, AI content assist UI, and sequence analytics.
 
 ### 📅 Phase 5: Announcements, Calendar & Appointment Scheduling

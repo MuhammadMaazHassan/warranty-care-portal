@@ -4,21 +4,19 @@ import { Pool } from "pg";
 
 const prismaClientSingleton = () => {
   const connectionString = process.env.DATABASE_URL;
-  
+
   if (!connectionString) {
-    // If no connection string is provided, return a standard client 
-    // (though it might fail if used without an adapter in Prisma 7)
     return new PrismaClient();
   }
 
-  const pool = new Pool({ 
+  const pool = new Pool({
     connectionString,
-    max: 2, // Limit database connection pool size per server instance to avoid exhaustion
-    connectionTimeoutMillis: 5000, // Timeout after 5 seconds instead of hanging
-    idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+    max: 2,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
   });
   const adapter = new PrismaPg(pool);
-  
+
   return new PrismaClient({ adapter });
 };
 

@@ -47,23 +47,29 @@ model User {
 }
 
 model Company {
-  id              String                  @id @default(cuid())
-  name            String
-  logo            String?
-  email           String?
-  phone           String?
-  address         String?
-  warrantyPolicy  String?                 @db.Text
-  botColor        String?                 @default("#0F3B3D")
-  users           User[]
-  knowledgeBase   KnowledgeBaseDocument[]
-  integrations    Integration[]
-  communities     Community[]
-  leads           Lead[]
-  segments        LeadSegment[]
-  knowledgeBaseId String?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime             @updatedAt
+  id                    String                  @id @default(cuid())
+  name                  String
+  logo                  String?
+  email                 String?
+  phone                 String?
+  address               String?
+  warrantyPolicy        String?                 @db.Text
+  botColor              String?                 @default("#0F3B3D")
+  users                 User[]
+  knowledgeBase         KnowledgeBaseDocument[]
+  integrations          Integration[]
+  communities           Community[]
+  leads                 Lead[]
+  segments              LeadSegment[]
+  salesforceConnection  SalesforceConnection?
+  knowledgeBaseId       String?
+  defaultLeadOwner      String?
+  voiceProfile          String?                 @default("professional")
+  maxSmsPerHour         Int                     @default(60)
+  complianceOptInRequired Boolean               @default(true)
+  suppressionList       SuppressionList[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime             @updatedAt
 }
 
 model Integration {
@@ -209,5 +215,65 @@ model SalesAppointment {
   agent     User     @relation("AgentAppointments", fields: [agentId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Salesforce CRM Connector Models ──────────────────────────────────────────
+
+model SalesforceConnection {
+  id              String    @id @default(cuid())
+  companyId       String    @unique
+  company         Company   @relation(fields: [companyId], references: [id])
+  instanceUrl     String                // e.g., https://yourorg.my.salesforce.com
+  accessToken     String    @db.Text    // Encrypted OAuth access token
+  refreshToken    String    @db.Text    // Encrypted OAuth refresh token
+  tokenExpiresAt  DateTime              // When the access token expires
+  environment     String    @default("sandbox")  // "production" | "sandbox"
+  clientId        String                // OAuth Consumer Key
+  clientSecret    String    @db.Text    // OAuth Consumer Secret (encrypted)
+  syncInterval    Int       @default(15)         // Minutes between cron syncs
+  isActive        Boolean   @default(true)
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?               // "SUCCESS" | "ERROR" | "WARNING"
+  lastSyncMessage String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  direction   String              // "INBOUND" | "OUTBOUND" (write-back)
+  action      String              // "BULK_IMPORT" | "INCREMENTAL_SYNC" | "WRITE_BACK"
+  status      String              // "SUCCESS" | "WARNING" | "ERROR"
+  recordCount Int      @default(0)
+  errorCount  Int      @default(0)
+  message     String?  @db.Text
+  metadata    Json?               // Additional details (e.g., error rows)
+  createdAt   DateTime @default(now())
+}
+
+model SalesforceFieldMapping {
+  id               String   @id @default(cuid())
+  companyId        String
+  salesforceField  String              // e.g., "FirstName"
+  portalField      String              // e.g., "firstName"
+  description      String?
+  isActive         Boolean  @default(true)
+  isConsentField   Boolean  @default(false)  // Flag for consent mapping (SW-CRM-009)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([companyId, salesforceField])
+}
+
+model SuppressionList {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  value     String   // email address or phone number
+  reason    String   // "UNSUBSCRIBE" | "BOUNCE" | "COMPLAINT"
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, value])
 }
 
