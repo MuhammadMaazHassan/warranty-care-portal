@@ -311,3 +311,35 @@ export const importLeads = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const deleteLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user || !req.user.companyId) {
+      return res.status(403).json({ message: "User is not associated with a company." });
+    }
+
+    const lead = await prisma.lead.findUnique({
+      where: { id }
+    });
+
+    if (!lead || lead.companyId !== req.user.companyId) {
+      return res.status(404).json({ message: "Lead not found." });
+    }
+
+    if (req.user.role.toUpperCase() === "HOMEOWNER" && lead.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "You do not have permission to delete this lead." });
+    }
+
+    await prisma.lead.delete({
+      where: { id }
+    });
+
+    return res.json({ message: "Lead deleted successfully." });
+  } catch (error) {
+    console.error("Delete lead error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+

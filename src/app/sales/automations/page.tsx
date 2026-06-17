@@ -71,8 +71,8 @@ interface AutomationRule {
 const initialRules: AutomationRule[] = [
   {
     id: "AUTO-001",
-    name: "Lead Replied Sequence Enrollment",
-    description: "When a builder prospect replies to any SMS or email, automatically pause active nurture sequences and notify the owner.",
+    name: "Lead Replied Campaign Enrollment",
+    description: "When a builder prospect replies to any SMS or email, automatically pause active nurture campaigns and notify the owner.",
     trigger: {
       event: "LEAD_REPLIED",
       description: "Prospect responds to email, SMS, or portal chat"
@@ -95,7 +95,7 @@ const initialRules: AutomationRule[] = [
   {
     id: "AUTO-002",
     name: "Salesforce Import - Post-Close Care Campaign",
-    description: "Triggers when a lead object is synced from CRM and has a 'Year 1' tag. Enrolls them into the Year 1 onboarding sequence.",
+    description: "Triggers when a lead object is synced from CRM and has a 'Year 1' tag. Enrolls them into the Year 1 onboarding campaign.",
     trigger: {
       event: "CRM_INGEST",
       description: "Lead is synchronized from Salesforce"
@@ -105,7 +105,7 @@ const initialRules: AutomationRule[] = [
       { field: "emailOptIn", operator: "EQUALS", value: "true" }
     ],
     actions: [
-      { type: "ENROLL_SEQUENCE", params: { sequenceId: "SEQ-09", sequenceName: "Year 1 Care Campaign" } }
+      { type: "ENROLL_CAMPAIGN", params: { campaignId: "SEQ-09", campaignName: "Year 1 Care Campaign" } }
     ],
     isActive: true,
     rateLimitCount: 5,
@@ -120,7 +120,7 @@ const initialRules: AutomationRule[] = [
     description: "Checks local timezone offsets before firing automated texts. Holds delivery until standard active windows (9 AM - 6 PM).",
     trigger: {
       event: "OUTBOUND_SMS_TRIGGERED",
-      description: "Sequence attempt to send automated text"
+      description: "Campaign attempt to send automated text"
     },
     conditions: [
       { field: "localTime", operator: "NOT_IN_WINDOW", value: "09:00-18:00" }
@@ -145,8 +145,8 @@ const standardTriggers = [
 ];
 
 const standardActions = [
-  { value: "PAUSE_CAMPAIGNS", label: "Pause Active Sequences", params: ["reason"] },
-  { value: "ENROLL_SEQUENCE", label: "Enroll in Sequence", params: ["sequenceId", "sequenceName"] },
+  { value: "PAUSE_CAMPAIGNS", label: "Pause Active Campaigns", params: ["reason"] },
+  { value: "ENROLL_CAMPAIGN", label: "Enroll in Campaign", params: ["campaignId", "campaignName"] },
   { value: "NOTIFY_OWNER", label: "Send Agent Alert Notification", params: ["channels", "priority"] },
   { value: "UPDATE_STATUS", label: "Modify Outreach Status", params: ["newStatus"] },
   { value: "DELAY_DELIVERY", label: "Delay Delivery Until Window", params: ["resumeTime"] }
@@ -337,7 +337,7 @@ export default function AutomationsPage() {
                 Workflow Automation Builder
               </h1>
               <p className="text-muted-foreground text-sm mt-1">
-                Configure automated rules (Trigger $\rightarrow$ Condition $\rightarrow$ Action) to coordinate sequence enrollment and Salesforce routing.
+                Configure automated rules (Trigger $\rightarrow$ Condition $\rightarrow$ Action) to coordinate campaign enrollment and Salesforce routing.
               </p>
             </div>
             <Button onClick={() => handleOpenRuleModal()} className="bg-[#b48c3c] text-white hover:bg-[#b48c3c]/90 gap-2 h-9 border-none">

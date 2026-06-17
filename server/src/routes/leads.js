@@ -3,7 +3,8 @@ import { requireAuth } from "../middlewares/auth.js";
 import {
   getLeads,
   createLead,
-  importLeads
+  importLeads,
+  deleteLead
 } from "../controllers/leads.controller.js";
 
 const router = Router();
@@ -11,5 +12,6 @@ const router = Router();
 router.get("/", requireAuth, getLeads);
 router.post("/", requireAuth, createLead);
 router.post("/import", requireAuth, importLeads);
+router.delete("/:id", requireAuth, deleteLead);
 
 export default router;

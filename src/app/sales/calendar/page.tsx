@@ -21,7 +21,7 @@ import {
 import { motion } from "framer-motion";
 
 const mockAISuggestions = [
-  { id: "S-1", topic: "Post-COE Followup Survey", channel: "Email", date: "June 18", reason: "Gap detected: 14 days without customer contact post COE", outline: "Drip sequence trigger to gather testimonials and survey responses." },
+  { id: "S-1", topic: "Post-COE Followup Survey", channel: "Email", date: "June 18", reason: "Gap detected: 14 days without customer contact post COE", outline: "Drip campaign trigger to gather testimonials and survey responses." },
   { id: "S-2", topic: "Mortgage Interest Rate Drop Alert", channel: "SMS", date: "June 20", reason: "News Trigger: Interest rates dropped below 5.8%", outline: "Broadcast SMS alert to cold leads detailing updated monthly estimates." }
 ];
 

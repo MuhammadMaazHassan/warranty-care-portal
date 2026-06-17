@@ -1,11 +1,12 @@
 import prisma from "../lib/prisma.js";
 import { MailService } from "./mail-service.js";
+import { sendSms } from "./sms.service.js";
 
 export class NurtureRunner {
   static IS_RUNNING = false;
 
   static startWorker(intervalMs = 60000) {
-    console.log(`[Nurture Runner] Starting background sequence worker (polling every ${intervalMs / 1000}s)`);
+    console.log(`[Nurture Runner] Starting background campaign worker (polling every ${intervalMs / 1000}s)`);
     setInterval(async () => {
       if (this.IS_RUNNING) return;
       this.IS_RUNNING = true;
@@ -23,13 +24,13 @@ export class NurtureRunner {
     const now = new Date();
 
     // Fetch active enrollments whose execution time has passed
-    const enrollments = await prisma.sequenceEnrollment.findMany({
+    const enrollments = await prisma.campaignEnrollment.findMany({
       where: {
         status: "ACTIVE",
         nextRunAt: {
           lte: now,
         },
-        sequence: {
+        campaign: {
           status: "Active"
         }
       },
@@ -37,7 +38,7 @@ export class NurtureRunner {
         lead: {
           include: { company: true },
         },
-        sequence: {
+        campaign: {
           include: { steps: true },
         },
       },
@@ -49,7 +50,7 @@ export class NurtureRunner {
 
     for (const enrollment of enrollments) {
       try {
-        const { lead, sequence } = enrollment;
+        const { lead, campaign } = enrollment;
 
         // 1. Check Exit Conditions / Compliance
         let shouldExit = false;
@@ -95,7 +96,7 @@ export class NurtureRunner {
         }
 
         if (shouldExit) {
-          await prisma.sequenceEnrollment.update({
+          await prisma.campaignEnrollment.update({
             where: { id: enrollment.id },
             data: {
               status: "EXITED",
@@ -103,40 +104,44 @@ export class NurtureRunner {
             },
           });
 
+          await this.checkCampaignCompletion(campaign.id);
+
           await prisma.leadTimeline.create({
             data: {
               leadId: lead.id,
               type: "SYNC_UPDATE",
-              description: `Exited campaign "${sequence.name}". Reason: ${exitReason}`,
+              description: `Exited campaign "${campaign.name}". Reason: ${exitReason}`,
             },
           });
 
-          console.log(`[Nurture Runner] Lead ${lead.firstName} ${lead.lastName} exited sequence "${sequence.name}" due to ${exitReason}`);
+          console.log(`[Nurture Runner] Lead ${lead.firstName} ${lead.lastName} exited campaign "${campaign.name}" due to ${exitReason}`);
           continue;
         }
 
-        // 2. Fetch the next step in the sequence
+        // 2. Fetch the next step in the campaign
         const nextPosition = enrollment.currentStepPosition + 1;
-        const currentStep = sequence.steps.find((s) => s.position === nextPosition);
+        const currentStep = campaign.steps.find((s) => s.position === nextPosition);
 
         if (!currentStep) {
-          // No more steps, complete the sequence
-          await prisma.sequenceEnrollment.update({
+          // No more steps, complete the campaign
+          await prisma.campaignEnrollment.update({
             where: { id: enrollment.id },
             data: {
               status: "COMPLETED",
             },
           });
 
+          await this.checkCampaignCompletion(campaign.id);
+
           await prisma.leadTimeline.create({
             data: {
               leadId: lead.id,
               type: "SYNC_UPDATE",
-              description: `Completed nurture sequence: "${sequence.name}"`,
+              description: `Completed nurture campaign: "${campaign.name}"`,
             },
           });
 
-          console.log(`[Nurture Runner] Lead ${lead.firstName} ${lead.lastName} finished sequence "${sequence.name}"`);
+          console.log(`[Nurture Runner] Lead ${lead.firstName} ${lead.lastName} finished campaign "${campaign.name}"`);
           continue;
         }
 
@@ -167,7 +172,7 @@ export class NurtureRunner {
             currentStep.delayUnit || "DAYS"
           );
 
-          await prisma.sequenceEnrollment.update({
+          await prisma.campaignEnrollment.update({
             where: { id: enrollment.id },
             data: {
               currentStepPosition: nextPosition,
@@ -234,25 +239,46 @@ export class NurtureRunner {
           }
 
           // Advance position and schedule next step
-          await this.advanceAndScheduleNextStep(enrollment.id, nextPosition, sequence.steps);
+          await this.advanceAndScheduleNextStep(enrollment.id, nextPosition, campaign.steps);
         } else if (currentStep.type === "SMS") {
-          // Send Nurture SMS (simulated text outbox)
+          // Send Nurture SMS via Twilio
           if (lead.phone) {
             const body = renderText(currentStep.body || "") + " Reply STOP to opt out.";
-            console.log(`[Nurture Runner] SMS sent to ${lead.phone}: "${body}"`);
+            
+            let smsSuccess = false;
+            let errorMessage = "";
+            try {
+              await sendSms({ to: lead.phone, body });
+              smsSuccess = true;
+            } catch (smsError) {
+              errorMessage = smsError.message;
+              console.error(`[Nurture Runner] SMS error for lead ${lead.phone}:`, errorMessage);
+            }
 
-            await prisma.leadTimeline.create({
-              data: {
-                leadId: lead.id,
-                type: "SMS_SENT",
-                description: `Sent campaign SMS: "${body.slice(0, 50)}${body.length > 50 ? "..." : ""}"`,
-                metadata: { body },
-              },
-            });
+            if (smsSuccess) {
+              console.log(`[Nurture Runner] SMS sent to ${lead.phone}: "${body}"`);
+              await prisma.leadTimeline.create({
+                data: {
+                  leadId: lead.id,
+                  type: "SMS_SENT",
+                  description: `Sent campaign SMS: "${body.slice(0, 50)}${body.length > 50 ? "..." : ""}"`,
+                  metadata: { body },
+                },
+              });
+            } else {
+              await prisma.leadTimeline.create({
+                data: {
+                  leadId: lead.id,
+                  type: "SMS_FAILED",
+                  description: `Failed to send campaign SMS: ${errorMessage}`,
+                  metadata: { body, error: errorMessage },
+                },
+              });
+            }
           }
 
           // Advance position and schedule next step
-          await this.advanceAndScheduleNextStep(enrollment.id, nextPosition, sequence.steps);
+          await this.advanceAndScheduleNextStep(enrollment.id, nextPosition, campaign.steps);
         }
       } catch (err) {
         console.error(`[Nurture Runner] Failed processing enrollment ${enrollment.id}:`, err);
@@ -274,7 +300,7 @@ export class NurtureRunner {
       );
     }
 
-    await prisma.sequenceEnrollment.update({
+    await prisma.campaignEnrollment.update({
       where: { id: enrollmentId },
       data: {
         currentStepPosition: completedPosition,
@@ -296,5 +322,26 @@ export class NurtureRunner {
       d.setDate(d.getDate() + value);
     }
     return d;
+  }
+
+  static async checkCampaignCompletion(campaignId) {
+    try {
+      const activeCount = await prisma.campaignEnrollment.count({
+        where: {
+          campaignId,
+          status: { in: ["ACTIVE", "PAUSED"] }
+        }
+      });
+
+      if (activeCount === 0) {
+        await prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: "Ready" }
+        });
+        console.log(`[Nurture Runner] Campaign ${campaignId} marked as Ready because all enrollments are finished.`);
+      }
+    } catch (error) {
+      console.error(`[Nurture Runner] Error checking completion for campaign ${campaignId}:`, error);
+    }
   }
 }

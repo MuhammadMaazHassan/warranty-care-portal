@@ -620,11 +620,9 @@ export default function DashboardPage() {
                   <Table className="min-w-[900px] border-collapse">
                     <TableHeader className="bg-muted/15 border-b border-border/50">
                       <TableRow>
-                        <TableHead className="font-semibold text-xs text-muted-foreground py-3 pl-6">ID</TableHead>
-                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Homeowner</TableHead>
+                        <TableHead className="font-semibold text-xs text-muted-foreground py-3 pl-6">Homeowner</TableHead>
                         <TableHead className="font-semibold text-xs text-muted-foreground py-3">Address</TableHead>
                         <TableHead className="font-semibold text-xs text-muted-foreground py-3">Issue</TableHead>
-                        <TableHead className="font-semibold text-xs text-muted-foreground py-3">Type</TableHead>
                         <TableHead className="font-semibold text-xs text-muted-foreground py-3">Year</TableHead>
                         <TableHead className="font-semibold text-xs text-muted-foreground py-3">Priority</TableHead>
                         <TableHead className="font-semibold text-xs text-muted-foreground py-3">Status</TableHead>
@@ -638,12 +636,7 @@ export default function DashboardPage() {
                           onClick={() => router.push(`/warranty/tickets/${ticket.id}`)}
                           className="border-b border-border/30 hover:bg-muted/15 transition-colors group cursor-pointer"
                         >
-                          <TableCell className="py-3.5 pl-6">
-                            <span className="font-mono text-[11px] font-semibold text-foreground bg-primary/10 px-2 py-1 rounded border border-primary/20 group-hover:bg-primary/15 transition-all" title={ticket.id}>
-                              {ticket.id.startsWith("T-") ? ticket.id : `${ticket.id.substring(0, 8)}...`}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-3.5 font-medium text-foreground text-sm">
+                          <TableCell className="py-3.5 pl-6 font-medium text-foreground text-sm">
                             {ticket.homeowner?.name || "Unknown"}
                           </TableCell>
                           <TableCell className="py-3.5 text-muted-foreground text-xs max-w-[200px] truncate" title={ticket.property?.address}>
@@ -651,9 +644,6 @@ export default function DashboardPage() {
                           </TableCell>
                           <TableCell className="py-3.5 text-foreground/90 font-medium text-xs max-w-[220px] truncate" title={ticket.issueType}>
                             {ticket.issueType}
-                          </TableCell>
-                          <TableCell className="py-3.5 text-muted-foreground text-xs uppercase">
-                            {ticket.ticketType || "-"}
                           </TableCell>
                           <TableCell className="py-3.5 text-muted-foreground text-xs">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[10px] font-semibold text-muted-foreground border border-border/50">

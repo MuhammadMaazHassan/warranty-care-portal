@@ -1,73 +1,87 @@
 import prisma from "../lib/prisma.js";
 
-export const getSequences = async (req, res) => {
+export const getCampaigns = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
     }
 
     const companyId = req.user.companyId;
-    const sequences = await prisma.sequence.findMany({
+    const campaigns = await prisma.campaign.findMany({
       where: { companyId },
       include: {
         _count: {
           select: {
             steps: true,
-            enrollments: { where: { status: "ACTIVE" } },
           },
         },
+        enrollments: {
+          select: { status: true, exitedReason: true }
+        }
       },
       orderBy: { createdAt: "desc" },
     });
 
     // Format metrics matches frontend format
-    const formatted = sequences.map((seq) => ({
-      id: seq.id,
-      name: seq.name,
-      description: seq.description,
-      status: seq.status,
-      channel: seq.channel,
-      stepsCount: seq._count.steps,
-      activeLeads: seq._count.enrollments,
-      conversionRate: "0.0%",
-      conversionCount: 0,
-    }));
+    const formatted = campaigns.map((seq) => {
+      const totalLeads = seq.enrollments.length;
+      const convertedLeads = seq.enrollments.filter(e => 
+        e.status === "EXITED" && (e.exitedReason === "REPLY" || e.exitedReason === "APPOINTMENT")
+      ).length;
+      
+      const conversionRate = totalLeads > 0 
+        ? ((convertedLeads / totalLeads) * 100).toFixed(1) + "%" 
+        : "0.0%";
+
+      return {
+        id: seq.id,
+        name: seq.name,
+        description: seq.description,
+        status: seq.status,
+        channel: seq.channel,
+        stepsCount: seq._count.steps,
+        totalLeads: totalLeads,
+        conversionRate: conversionRate,
+        conversionCount: convertedLeads,
+      };
+    });
 
     return res.json(formatted);
   } catch (error) {
-    console.error("[Sequences List] Error:", error);
+    console.error("[Campaigns List] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const getSequenceDetail = async (req, res) => {
+export const getCampaignDetail = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
     }
 
     const { id } = req.params;
-    const sequence = await prisma.sequence.findFirst({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, companyId: req.user.companyId },
       include: {
         steps: {
           orderBy: { position: "asc" },
         },
+        enrollments: true,
       },
     });
 
-    if (!sequence) {
-      return res.status(404).json({ message: "Sequence not found" });
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
     }
 
-    return res.json(sequence);
+    return res.json(campaign);
   } catch (error) {
-    console.error("[Sequence Detail] Error:", error);
+    console.error("[Campaign Detail] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const createSequence = async (req, res) => {
+export const createCampaign = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
@@ -76,10 +90,10 @@ export const createSequence = async (req, res) => {
     const { name, description, channel } = req.body;
 
     if (!name) {
-      return res.status(400).json({ message: "Sequence name is required" });
+      return res.status(400).json({ message: "Campaign name is required" });
     }
 
-    const sequence = await prisma.sequence.create({
+    const campaign = await prisma.campaign.create({
       data: {
         companyId: req.user.companyId,
         name,
@@ -89,14 +103,14 @@ export const createSequence = async (req, res) => {
       },
     });
 
-    return res.status(201).json(sequence);
+    return res.status(201).json(campaign);
   } catch (error) {
-    console.error("[Sequence Create] Error:", error);
+    console.error("[Campaign Create] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const updateSequence = async (req, res) => {
+export const updateCampaign = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
@@ -105,32 +119,44 @@ export const updateSequence = async (req, res) => {
     const { id } = req.params;
     const { name, description, channel, status } = req.body;
 
-    const sequence = await prisma.sequence.findFirst({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, companyId: req.user.companyId },
     });
 
-    if (!sequence) {
-      return res.status(404).json({ message: "Sequence not found" });
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
     }
 
-    const updated = await prisma.sequence.update({
+    const updated = await prisma.campaign.update({
       where: { id },
       data: {
-        name: name || sequence.name,
-        description: description !== undefined ? description : sequence.description,
-        channel: channel || sequence.channel,
-        status: status || sequence.status,
+        name: name || campaign.name,
+        description: description !== undefined ? description : campaign.description,
+        channel: channel || campaign.channel,
+        status: status || campaign.status,
       },
     });
 
+    if (status === "Active" && req.body.relaunch) {
+      await prisma.campaignEnrollment.updateMany({
+        where: { campaignId: id },
+        data: {
+          status: "ACTIVE",
+          currentStepPosition: 0,
+          nextRunAt: new Date(),
+          exitedReason: null
+        }
+      });
+    }
+
     return res.json(updated);
   } catch (error) {
-    console.error("[Sequence Update] Error:", error);
+    console.error("[Campaign Update] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const updateSequenceSteps = async (req, res) => {
+export const updateCampaignSteps = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
@@ -144,20 +170,28 @@ export const updateSequenceSteps = async (req, res) => {
     }
 
     // Verify campaign ownership
-    const sequence = await prisma.sequence.findFirst({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, companyId: req.user.companyId },
     });
 
-    if (!sequence) {
-      return res.status(404).json({ message: "Sequence not found" });
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
     }
+
+    const finalStatus = (campaign.status === "Draft" || campaign.status === "Ready") 
+      ? (steps.length > 0 ? "Ready" : "Draft") 
+      : campaign.status;
 
     // Delete existing steps and insert new steps in transaction
     await prisma.$transaction([
-      prisma.sequenceStep.deleteMany({ where: { sequenceId: id } }),
-      prisma.sequenceStep.createMany({
+      prisma.campaign.update({
+        where: { id },
+        data: { status: finalStatus }
+      }),
+      prisma.campaignStep.deleteMany({ where: { campaignId: id } }),
+      prisma.campaignStep.createMany({
         data: steps.map((step, idx) => ({
-          sequenceId: id,
+          campaignId: id,
           type: step.type, // "EMAIL", "SMS", "DELAY"
           position: idx + 1,
           delayValue: step.delayValue !== undefined ? parseInt(step.delayValue, 10) : null,
@@ -169,19 +203,19 @@ export const updateSequenceSteps = async (req, res) => {
       }),
     ]);
 
-    const updatedSequence = await prisma.sequence.findUnique({
+    const updatedCampaign = await prisma.campaign.findUnique({
       where: { id },
       include: { steps: { orderBy: { position: "asc" } } },
     });
 
-    return res.json(updatedSequence);
+    return res.json(updatedCampaign);
   } catch (error) {
-    console.error("[Sequence Steps Update] Error:", error);
+    console.error("[Campaign Steps Update] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const enrollSequence = async (req, res) => {
+export const enrollCampaign = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
@@ -194,12 +228,12 @@ export const enrollSequence = async (req, res) => {
       return res.status(400).json({ message: "leadIds array is required" });
     }
 
-    const sequence = await prisma.sequence.findFirst({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, companyId: req.user.companyId },
     });
 
-    if (!sequence) {
-      return res.status(404).json({ message: "Sequence not found" });
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
     }
 
     let enrolledCount = 0;
@@ -214,16 +248,16 @@ export const enrollSequence = async (req, res) => {
         if (!lead) continue;
 
         // Upsert enrollment to start at step 0 immediately
-        await prisma.sequenceEnrollment.upsert({
+        await prisma.campaignEnrollment.upsert({
           where: {
-            leadId_sequenceId: {
+            leadId_campaignId: {
               leadId,
-              sequenceId: id,
+              campaignId: id,
             },
           },
           create: {
             leadId,
-            sequenceId: id,
+            campaignId: id,
             status: "ACTIVE",
             currentStepPosition: 0,
             nextRunAt: new Date(), // run first step immediately
@@ -241,7 +275,7 @@ export const enrollSequence = async (req, res) => {
           data: {
             leadId,
             type: "SYNC_UPDATE",
-            description: `Enrolled in nurture sequence "${sequence.name}"`,
+            description: `Enrolled in nurture campaign "${campaign.name}"`,
           },
         });
 
@@ -253,12 +287,12 @@ export const enrollSequence = async (req, res) => {
 
     return res.json({ success: true, enrolledCount });
   } catch (error) {
-    console.error("[Sequence Enroll] Error:", error);
+    console.error("[Campaign Enroll] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const deleteSequence = async (req, res) => {
+export const deleteCampaign = async (req, res) => {
   try {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
@@ -266,19 +300,19 @@ export const deleteSequence = async (req, res) => {
 
     const { id } = req.params;
 
-    const sequence = await prisma.sequence.findFirst({
+    const campaign = await prisma.campaign.findFirst({
       where: { id, companyId: req.user.companyId },
     });
 
-    if (!sequence) {
-      return res.status(404).json({ message: "Sequence not found" });
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
     }
 
-    await prisma.sequence.delete({ where: { id } });
+    await prisma.campaign.delete({ where: { id } });
 
-    return res.json({ success: true, message: "Sequence deleted successfully" });
+    return res.json({ success: true, message: "Campaign deleted successfully" });
   } catch (error) {
-    console.error("[Sequence Delete] Error:", error);
+    console.error("[Campaign Delete] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };

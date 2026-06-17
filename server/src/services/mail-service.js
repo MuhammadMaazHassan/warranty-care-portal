@@ -4,7 +4,7 @@ export class MailService {
   static SMTP_HOST = process.env.SMTP_HOST || "smtp-relay.brevo.com";
   static SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
   static SMTP_USER = process.env.SMTP_USER || "";
-  static SMTP_PASS = process.env.SMTP_PASS || process.env.BREVO_API_KEY || "";
+  static SMTP_PASS = process.env.SMTP_PASS || "";
   static SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@bitzsol.com";
   static SENDER_NAME = "Ai.Lumen Warranty Care";
 
@@ -43,7 +43,7 @@ export class MailService {
   static async sendTicketStatusUpdate(to, homeownerName, ticketId, status) {
     const statusLabel = status.replace("_", " ").toLowerCase();
     const subject = `Ticket Update: ${ticketId} is now ${statusLabel}`;
-    
+
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
         <div style="background: #b48c3c; color: white; padding: 20px; text-align: center;">
@@ -74,7 +74,7 @@ export class MailService {
 
   static async sendVerificationOtp(to, otp) {
     const subject = `Your Verification Code is ${otp}`;
-    
+
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
         <div style="background: #0F3B3D; color: white; padding: 20px; text-align: center;">
@@ -100,7 +100,7 @@ export class MailService {
 
   static async sendPasswordResetOtp(to, otp) {
     const subject = `Reset Your Password - Verification Code: ${otp}`;
-    
+
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
         <div style="background: #0F3B3D; color: white; padding: 20px; text-align: center;">

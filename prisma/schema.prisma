@@ -68,7 +68,7 @@ model Company {
   maxSmsPerHour         Int                     @default(60)
   complianceOptInRequired Boolean               @default(true)
   suppressionList       SuppressionList[]
-  sequences             Sequence[]
+  campaigns             Campaign[]
   emailTemplates        EmailTemplate[]
   calendarEvents        ContentCalendar[]
   salesKB               SalesKB[]
@@ -184,7 +184,7 @@ model Lead {
   customFields      Json?              // Custom metadata (key-value)
   timeline          LeadTimeline[]
   appointments      SalesAppointment[]
-  sequenceEnrollments SequenceEnrollment[]
+  campaignEnrollments CampaignEnrollment[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 }
@@ -288,7 +288,7 @@ enum StepType {
   DELAY
 }
 
-model Sequence {
+model Campaign {
   id              String               @id @default(cuid())
   companyId       String
   company         Company              @relation(fields: [companyId], references: [id])
@@ -296,16 +296,17 @@ model Sequence {
   description     String?
   status          String               @default("Draft") // "Active" | "Draft" | "Archived"
   channel         String               @default("Email & SMS")
-  steps           SequenceStep[]
-  enrollments     SequenceEnrollment[]
+  steps           CampaignStep[]
+  enrollments     CampaignEnrollment[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+
 }
 
-model SequenceStep {
+model CampaignStep {
   id              String               @id @default(cuid())
-  sequenceId      String
-  sequence        Sequence             @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  campaignId      String
+  campaign        Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   type            StepType
   position        Int                  // 1-indexed order of the step
   delayValue      Int?                 // e.g. 2
@@ -316,14 +317,15 @@ model SequenceStep {
   template        EmailTemplate?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+
 }
 
-model SequenceEnrollment {
+model CampaignEnrollment {
   id                  String             @id @default(cuid())
   leadId              String
   lead                Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  sequenceId          String
-  sequence            Sequence           @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  campaignId          String
+  campaign            Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   status              String             @default("ACTIVE") // ACTIVE, COMPLETED, PAUSED, EXITED
   exitedReason        String?            // "REPLY", "APPOINTMENT", "UNSUBSCRIBE", "MANUAL", "STATUS_CHANGE"
   currentStepPosition Int                @default(0)        // Last executed step position
@@ -331,7 +333,7 @@ model SequenceEnrollment {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  @@unique([leadId, sequenceId])
+  @@unique([leadId, campaignId])
 }
 
 model EmailTemplate {
@@ -342,7 +344,7 @@ model EmailTemplate {
   subject     String
   body        String         @db.Text
   variables   String[]       @default([]) // e.g. ["firstName", "lastName", "bookingLink"]
-  steps       SequenceStep[]
+  steps       CampaignStep[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }

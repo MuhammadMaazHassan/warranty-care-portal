@@ -215,20 +215,20 @@ export default function TicketsPage() {
       const matchYear =
         year === "all" ||
         (year === "1" ? t.warrantyYear === 1 : t.warrantyYear >= 2);
-      
+
       const matchProperty = property === "all" || t.property?.address === property;
-      
+
       let matchDate = true;
       if (dateRange !== "all") {
         const ticketDate = new Date(t.createdAt);
         const now = new Date();
         const diffDays = (now.getTime() - ticketDate.getTime()) / (1000 * 3600 * 24);
-        
+
         if (dateRange === "7d") matchDate = diffDays <= 7;
         else if (dateRange === "30d") matchDate = diffDays <= 30;
         else if (dateRange === "90d") matchDate = diffDays <= 90;
       }
-      
+
       return matchSearch && matchStatus && matchPriority && matchYear && matchProperty && matchDate;
     });
   }, [tickets, search, status, priority, year, property, dateRange]);
@@ -469,9 +469,9 @@ export default function TicketsPage() {
                     </Select>
                   </div>
                   <div>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleResetFilters} 
+                    <Button
+                      variant="outline"
+                      onClick={handleResetFilters}
                       className="w-full h-9 gap-2 text-xs font-medium text-muted-foreground hover:text-foreground border-border/80 hover:bg-muted/40 transition-all rounded-lg"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -537,7 +537,7 @@ export default function TicketsPage() {
                               {ticket.status.replace("_", " ")}
                             </Badge>
                           </div>
-                          
+
                           <div className="space-y-1 text-xs">
                             <div className="font-medium text-foreground">{ticket.issueType}</div>
                             {ticket.ticketType && <div className="text-[10px] text-muted-foreground uppercase">{ticket.ticketType}</div>}
@@ -546,7 +546,7 @@ export default function TicketsPage() {
                               {ticket.property?.address || "No property address linked"}
                             </div>
                           </div>
-                          
+
                           <div className="flex justify-between items-center text-[11px] text-muted-foreground pt-1 border-t border-border/40">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold border shadow-2xs", priorityStyles[ticket.priority].bg, priorityStyles[ticket.priority].text, priorityStyles[ticket.priority].border)}>
@@ -556,7 +556,7 @@ export default function TicketsPage() {
                             </div>
                             <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
                           </div>
-                          
+
                           <div className="flex justify-end gap-2 pt-2 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                             <Link href={`/warranty/tickets/${ticket.id}`} className="w-fit">
                               <Button variant="ghost" size="sm" className="h-7 text-xs">
@@ -575,11 +575,9 @@ export default function TicketsPage() {
                     <Table className="min-w-[900px] border-collapse">
                       <TableHeader className="bg-muted/15 border-b border-border/50">
                         <TableRow>
-                          <TableHead className="font-semibold text-xs text-muted-foreground py-3 pl-6">ID</TableHead>
-                          <TableHead className="font-semibold text-xs text-muted-foreground py-3">Homeowner</TableHead>
+                          <TableHead className="font-semibold text-xs text-muted-foreground py-3 pl-6">Homeowner</TableHead>
                           <TableHead className="font-semibold text-xs text-muted-foreground py-3">Address</TableHead>
                           <TableHead className="font-semibold text-xs text-muted-foreground py-3">Issue</TableHead>
-                          <TableHead className="font-semibold text-xs text-muted-foreground py-3">Type</TableHead>
                           <TableHead className="font-semibold text-xs text-muted-foreground py-3">Year</TableHead>
                           <TableHead className="font-semibold text-xs text-muted-foreground py-3">Priority</TableHead>
                           <TableHead className="font-semibold text-xs text-muted-foreground py-3">Status</TableHead>
@@ -599,12 +597,7 @@ export default function TicketsPage() {
                               onClick={() => router.push(`/warranty/tickets/${ticket.id}`)}
                               className="border-b border-border/30 hover:bg-muted/15 transition-colors group cursor-pointer"
                             >
-                              <TableCell className="py-3.5 pl-6">
-                                <span className="font-mono text-[11px] font-semibold text-foreground bg-primary/10 px-2 py-1 rounded border border-primary/20 group-hover:bg-primary/15 transition-all" title={ticket.id}>
-                                  {ticket.id.startsWith("T-") ? ticket.id : `${ticket.id.substring(0, 8)}...`}
-                                </span>
-                              </TableCell>
-                              <TableCell className="py-3.5 font-medium text-foreground text-sm">
+                              <TableCell className="pl-6 py-3.5 font-medium text-foreground text-sm">
                                 {ticket.homeowner?.name || "Unknown"}
                               </TableCell>
                               <TableCell className="py-3.5 text-muted-foreground text-xs max-w-[200px] truncate" title={ticket.property?.address}>
@@ -612,9 +605,6 @@ export default function TicketsPage() {
                               </TableCell>
                               <TableCell className="py-3.5 text-foreground/90 font-medium text-xs max-w-[220px] truncate" title={ticket.issueType}>
                                 {ticket.issueType}
-                              </TableCell>
-                              <TableCell className="py-3.5 text-muted-foreground text-xs uppercase">
-                                {ticket.ticketType || "-"}
                               </TableCell>
                               <TableCell className="py-3.5 text-muted-foreground text-xs">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-[10px] font-semibold text-muted-foreground border border-border/50">

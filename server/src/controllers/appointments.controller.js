@@ -140,7 +140,7 @@ export const triggerCta = async (req, res) => {
       data: {
         leadId,
         type: "SYNC_UPDATE",
-        description: `Lead clicked nurture sequence CTA: "${ctaType || "Booking AppointmentLink"}"`,
+        description: `Lead clicked nurture campaign CTA: "${ctaType || "Booking AppointmentLink"}"`,
         metadata: { ctaType, clickedAt: new Date() },
       },
     });

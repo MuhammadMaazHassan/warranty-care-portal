@@ -68,7 +68,7 @@ const warrantyNavItems = [
 const salesNavItems = [
   { name: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] },
   { name: "Leads", href: "/sales/leads", icon: Users, roles: ["admin", "staff"] },
-  { name: "Sequences", href: "/sales/sequences", icon: Layers, roles: ["admin", "staff"] },
+  { name: "Campaigns", href: "/sales/campaigns", icon: Layers, roles: ["admin", "staff"] },
   { name: "Content Calendar", href: "/sales/calendar", icon: CalendarDays, roles: ["admin", "staff"] },
   { name: "Announcements", href: "/sales/announcements", icon: Bot, roles: ["admin", "staff"] },
   { name: "Appointments", href: "/sales/scheduling", icon: CalendarDays, roles: ["admin", "staff"] },

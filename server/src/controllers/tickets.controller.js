@@ -1,7 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { calculateWarrantyYear } from "../lib/utils.js";
 import { generateTicketId } from "../lib/ticket-utils.js";
-import { MailService } from "../lib/mail-service.js";
+import { MailService } from "../services/mail-service.js";
 
 export const getTickets = async (req, res) => {
   try {

@@ -6,7 +6,7 @@ import authRouter from "./routes/auth.js";
 import leadsRouter from "./routes/leads.js";
 import complianceRouter from "./routes/compliance.js";
 import salesforceRouter from "./routes/salesforce.js";
-import sequencesRouter from "./routes/sequences.js";
+import campaignsRouter from "./routes/campaigns.js";
 import calendarRouter from "./routes/calendar.js";
 import kbRouter from "./routes/kb.js";
 import appointmentsRouter from "./routes/appointments.js";
@@ -25,6 +25,7 @@ import homeownersRouter from "./routes/homeowners.js";
 import usersRouter from "./routes/users.js";
 
 import { NurtureRunner } from "./services/nurture-runner.js";
+import { initSms } from "./services/sms.service.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -44,7 +45,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/sales/leads", leadsRouter);
 app.use("/api/sales/compliance", complianceRouter);
 app.use("/api/sales/salesforce", salesforceRouter);
-app.use("/api/sales/sequences", sequencesRouter);
+app.use("/api/sales/campaigns", campaignsRouter);
 app.use("/api/sales/calendar", calendarRouter);
 app.use("/api/sales/kb", kbRouter);
 app.use("/api/sales/appointments", appointmentsRouter);
@@ -74,7 +75,7 @@ app.get("/api/cron/nurture", async (req, res) => {
     await NurtureRunner.processActiveEnrollments();
     res.json({ success: true, timestamp: new Date() });
   } catch (error) {
-    console.error("[Cron] Error processing nurture sequence:", error);
+    console.error("[Cron] Error processing nurture campaign:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -85,9 +86,11 @@ if (process.env.VERCEL) {
 } else {
   app.listen(port, () => {
     console.log(`[Server] Standalone backend running on port ${port}`);
+    // Initialize SMS service
+    initSms();
     
-    // Start the background Nurture Sequence Poller (polls every 60s)
-    NurtureRunner.startWorker(60000);
+    // Start the background Nurture Campaign Poller (polls every 10s)
+    NurtureRunner.startWorker(10000);
   });
 }
 

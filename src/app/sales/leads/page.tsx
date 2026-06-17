@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
 import PortalLayout from "@/components/layout/PortalLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,24 +39,12 @@ import {
   Search,
   Plus,
   RefreshCw,
-  FileDown,
   Upload,
-  Layers,
-  Calendar,
-  Activity,
   CheckCircle2,
-  AlertCircle,
   Clock,
-  X,
-  User,
   ShieldCheck,
-  Building2,
-  Trash2,
-  MoreVertical,
-  Check,
-  ChevronDown
+  Trash2
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface Lead {
   id: string;
@@ -91,19 +79,6 @@ const statusColors: Record<string, string> = {
   Unsubscribed: "bg-gray-50 text-gray-700 border-gray-200/50 dark:bg-gray-900/20 dark:text-gray-300"
 };
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  }
-};
-
 export default function LeadsPage() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -111,7 +86,6 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
-  const [toast, setToast] = useState<string | null>(null);
 
   // Manual Lead Modal state
   const [manualModalOpen, setManualModalOpen] = useState(false);
@@ -154,8 +128,11 @@ export default function LeadsPage() {
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    if (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("fail")) {
+      toast.error(msg);
+    } else {
+      toast.success(msg);
+    }
   };
 
   const fetchLeads = useCallback(async () => {
@@ -168,7 +145,7 @@ export default function LeadsPage() {
         setCurrentPage(1); // Reset to page 1 on new fetch
       }
     } catch (error) {
-      console.error("Error loading leads:", error);
+      showToast("Error loading leads");
     } finally {
       setLoading(false);
     }
@@ -195,10 +172,10 @@ export default function LeadsPage() {
         fetchLeads();
       } else {
         const err = await res.json();
-        alert(err.message || "Failed to delete lead.");
+        showToast(err.message || "Failed to delete lead.");
       }
     } catch (error) {
-      alert("Error deleting lead.");
+      showToast("Error deleting lead.");
     } finally {
       setLeadToDelete(null);
     }
@@ -208,7 +185,7 @@ export default function LeadsPage() {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualForm.firstName || !manualForm.lastName) {
-      alert("First name and last name are required.");
+      showToast("First name and last name are required.");
       return;
     }
     setSubmittingManual(true);
@@ -241,10 +218,10 @@ export default function LeadsPage() {
         fetchLeads();
       } else {
         const err = await res.json();
-        alert(err.message || "Failed to add lead.");
+        showToast(err.message || "Failed to add lead.");
       }
     } catch {
-      alert("Error adding lead.");
+      showToast("Error adding lead.");
     } finally {
       setSubmittingManual(false);
     }
@@ -253,14 +230,14 @@ export default function LeadsPage() {
   // CSV Parsing
   const handleCSVLoad = () => {
     if (!csvRawText.trim()) {
-      alert("Please paste some CSV content.");
+      showToast("Please paste some CSV content.");
       return;
     }
 
     // Split text by lines and clean commas
     const lines = csvRawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     if (lines.length < 2) {
-      alert("CSV must contain a header row and at least one data row.");
+      showToast("CSV must contain a header row and at least one data row.");
       return;
     }
 
@@ -346,10 +323,10 @@ export default function LeadsPage() {
         setCsvStep(5); // Completion step
         fetchLeads();
       } else {
-        alert(data.message || "Failed to parse import.");
+        showToast(data.message || "Failed to parse import.");
       }
     } catch (err) {
-      alert("Error executing leads import.");
+      showToast("Error executing leads import.");
     } finally {
       setImporting(false);
     }
@@ -481,21 +458,19 @@ export default function LeadsPage() {
                   <Table className="min-w-[1000px]">
                     <TableHeader className="bg-muted/15 border-b border-border/50">
                       <TableRow>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground pl-6">ID</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Prospect Name</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Contact details</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Status</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Opt-in Consent</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Ingested from</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground">Assigned agent</th>
-                        <th className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-right pr-6">Timeline</th>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Prospect Name</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Email</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Phone</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Status</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Opt-in Consent</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-left">Assigned agent</TableHead>
+                        <TableHead className="py-3.5 px-4 font-semibold text-xs text-muted-foreground text-right pr-6">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {leads.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((lead) => (
                         <TableRow key={lead.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition border-b border-border/30">
-                          <TableCell className="py-3 pl-6 font-mono text-xs font-semibold text-[#b48c3c]">{lead.id.substring(0, 8)}...</TableCell>
-                          <TableCell className="py-3 font-semibold text-slate-800 dark:text-slate-200">
+                          <TableCell className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200 align-middle">
                             <div>
                               <p className="text-sm font-semibold">{lead.firstName} {lead.lastName}</p>
                               <div className="flex gap-1 mt-1 flex-wrap">
@@ -507,34 +482,25 @@ export default function LeadsPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="py-3 text-xs">
-                            <div>
-                              <p className="font-semibold">{lead.email || "—"}</p>
-                              <p className="text-slate-400 mt-0.5">{lead.phone || "—"}</p>
-                            </div>
+                          <TableCell className="py-3 px-4 text-xs font-semibold text-slate-800 dark:text-slate-200 align-middle">
+                            {lead.email || "—"}
                           </TableCell>
-                          <TableCell className="py-3">
+                          <TableCell className="py-3 px-4 text-xs text-slate-500 font-medium align-middle">
+                            {lead.phone || "—"}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 align-middle">
                             <Badge variant="outline" className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold border ${statusColors[lead.status]}`}>
                               {lead.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-3 text-xs font-semibold">
+                          <TableCell className="py-3 px-4 text-xs font-semibold align-middle">
                             <div className="space-y-0.5">
                               {lead.emailOptIn ? <span className="text-green-600 block">✓ Email Opt-in</span> : <span className="text-slate-400 block">✗ Email Opt-out</span>}
                               {lead.smsOptIn ? <span className="text-green-600 block">✓ SMS Opt-in</span> : <span className="text-slate-400 block">✗ SMS Opt-out</span>}
                             </div>
                           </TableCell>
-                          <TableCell className="py-3 text-xs">
-                            <div>
-                              <p className="font-bold">{lead.source}</p>
-                              {lead.externalId && <p className="text-[10px] text-slate-400 font-mono mt-0.5">CRM: {lead.externalId.substring(0, 8)}</p>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 text-xs text-slate-600 dark:text-slate-300 font-medium">{lead.owner?.name || "Unassigned"}</TableCell>
-                          <TableCell className="py-3 text-right pr-6 space-x-1">
-                            <Button variant="ghost" size="sm" onClick={() => openTimeline(lead)} className="text-[#b48c3c] hover:bg-[#b48c3c]/10 text-xs">
-                              <Clock className="h-3.5 w-3.5 mr-1" /> View Logs
-                            </Button>
+                          <TableCell className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 font-medium align-middle">{lead.owner?.name || "Unassigned"}</TableCell>
+                          <TableCell className="py-3 px-4 text-right pr-6 space-x-1 align-middle">
                             <Button variant="ghost" size="sm" onClick={() => setLeadToDelete(lead.id)} className="text-red-500 hover:bg-red-500/10 text-xs px-2">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -733,14 +699,31 @@ export default function LeadsPage() {
             {/* STEP 1: Paste CSV content */}
             {csvStep === 1 && (
               <div className="space-y-4 pt-2">
-                <Label className="font-semibold text-sm">Paste CSV Text Content</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Ensure your CSV contains a headers row at the top (e.g. FirstName, LastName, Email, Phone, Tags).</p>
-                <textarea
-                  value={csvRawText}
-                  onChange={(e) => setCsvRawText(e.target.value)}
-                  placeholder="FirstName,LastName,Email,Phone,Tags&#10;John,Doe,john@example.com,+15550192834,Hot Lead;Referral&#10;Alice,Smith,alice@example.com,,Year 2"
-                  rows={8}
-                  className="w-full bg-background border p-4 text-xs font-mono rounded-xl focus:ring-1 focus:ring-[#b48c3c]"
+                <Label className="font-semibold text-sm">Upload CSV File</Label>
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                  <h4 className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1">Required Data & Headers</h4>
+                  <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80 leading-relaxed">
+                    Your CSV must contain at least a <strong>First Name</strong> and <strong>Last Name</strong> column. You can also map Email, Phone, Street, City, State, Zip Code, Tags, and SMS/Email Opt-In statuses.
+                  </p>
+                </div>
+                <Input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        if (evt.target?.result) {
+                          setCsvRawText(evt.target.result as string);
+                        }
+                      };
+                      reader.readAsText(file);
+                    } else {
+                      setCsvRawText("");
+                    }
+                  }}
+                  className="w-full text-xs cursor-pointer file:cursor-pointer"
                 />
                 <DialogFooter>
                   <Button variant="ghost" onClick={closeCSVWizard}>Cancel</Button>

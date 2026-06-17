@@ -418,7 +418,6 @@ export default function PropertiesPage() {
                           <TableHead>City &amp; Zip</TableHead>
                           <TableHead>Area</TableHead>
                           <TableHead>Homeowner</TableHead>
-                          <TableHead>COE Date</TableHead>
                           <TableHead>Coverage Term</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -445,9 +444,6 @@ export default function PropertiesPage() {
                                   <span className="font-medium text-gray-700 dark:text-slate-200">{p.homeowner?.name || "N/A"}</span>
                                   <span className="text-xs text-gray-400 dark:text-slate-400">{p.homeowner?.email}</span>
                                 </div>
-                              </TableCell>
-                              <TableCell className="text-gray-500 dark:text-slate-400">
-                                {p.coeDate ? new Date(p.coeDate).toLocaleDateString() : "N/A"}
                               </TableCell>
                               <TableCell>
                                 <Badge className="bg-[#0F3B3D]/10 text-[#0F3B3D] hover:bg-[#0F3B3D]/15 dark:bg-[#0F3B3D]/25 dark:text-[#a0c5c7] dark:hover:bg-[#0F3B3D]/35 font-semibold border-none">

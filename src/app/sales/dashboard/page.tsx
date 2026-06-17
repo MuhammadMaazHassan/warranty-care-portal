@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import PortalLayout from "@/components/layout/PortalLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,16 +12,9 @@ import {
   Users,
   Calendar,
   Layers,
-  ArrowUpRight,
   TrendingUp,
-  Activity,
-  CheckCircle2,
-  AlertCircle,
   FileSpreadsheet,
   RefreshCw,
-  Plus,
-  Mail,
-  MessageSquare
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -41,7 +33,7 @@ const mockAppointments = [
   { id: "A-503", leadName: "James Carter", type: "Design Center Review", time: "June 18 at 4:30 PM", status: "Pending", agent: "Alex Chen" }
 ];
 
-const mockSequences = [
+const mockCampaigns = [
   { name: "First-Time Homebuyer Campaign", channel: "Email & SMS", steps: 12, enrolled: 1420, active: 840, conversionRate: 8.4 },
   { name: "Model Home Tour Follow-up", channel: "Email Only", steps: 5, enrolled: 310, active: 45, conversionRate: 15.2 },
   { name: "Interest Rate Drop Alert", channel: "SMS Only", steps: 2, enrolled: 2450, active: 2450, conversionRate: 4.8 }
@@ -71,13 +63,65 @@ const staggerContainer = {
 export default function SalesDashboardPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [leads, setLeads] = useState(initialLeads);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalLeads: 0, activeCampaigns: 0, totalEnrolled: 0 });
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState("12 minutes ago");
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(timer);
+    async function fetchData() {
+      try {
+        const [leadsRes, campaignsRes] = await Promise.all([
+          fetch("/api/sales/leads"),
+          fetch("/api/sales/campaigns")
+        ]);
+
+        if (leadsRes.ok) {
+          const allLeadsData = await leadsRes.json();
+          setStats(s => ({ ...s, totalLeads: allLeadsData.length }));
+          
+          // Use first 5 for recent leads table
+          setLeads(allLeadsData.slice(0, 5).map((l: any) => ({
+            id: `L-${l.id.slice(-4).toUpperCase()}`,
+            name: `${l.firstName} ${l.lastName}`,
+            email: l.email,
+            phone: l.phone,
+            status: l.status,
+            source: l.source || "System",
+            owner: l.owner?.name || "Unassigned",
+            date: new Date(l.createdAt).toISOString().slice(0, 10)
+          })));
+        }
+
+        if (campaignsRes.ok) {
+          const campaignsData = await campaignsRes.json();
+          let activeCamps = 0;
+          let enrolledCamps = 0;
+          const mappedCamps = campaignsData.map((c: any) => {
+            const totalEnrollments = c.enrollments?.length || 0;
+            const activeEnrollments = c.enrollments?.filter((e: any) => e.status === "ACTIVE").length || 0;
+            if (c.status === "Active") activeCamps++;
+            enrolledCamps += totalEnrollments;
+            return {
+              name: c.name,
+              channel: c.channel || "Email & SMS",
+              enrolled: totalEnrollments,
+              active: activeEnrollments,
+              conversionRate: c.conversionRate || 0
+            };
+          });
+          setCampaigns(mappedCamps);
+          setStats(s => ({ ...s, activeCampaigns: activeCamps, totalEnrolled: enrolledCamps }));
+        }
+
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
   const handleSync = () => {
@@ -167,7 +211,7 @@ export default function SalesDashboardPage() {
                     <Users className="h-4 w-4 text-[#b48c3c]" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{leads.length + 840}</div>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{stats.totalLeads}</div>
                     <p className="text-xs text-muted-foreground mt-1">Combined Salesforce + CSV rows</p>
                   </CardContent>
                 </Card>
@@ -178,8 +222,8 @@ export default function SalesDashboardPage() {
                     <Layers className="h-4 w-4 text-[#0F3B3D]" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{mockSequences.length}</div>
-                    <p className="text-xs text-muted-foreground mt-1">3,335 enrolled recipients</p>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{stats.activeCampaigns}</div>
+                    <p className="text-xs text-muted-foreground mt-1">{stats.totalEnrolled} enrolled recipients</p>
                   </CardContent>
                 </Card>
 
@@ -222,7 +266,6 @@ export default function SalesDashboardPage() {
                 <table className="w-full text-left text-sm border-collapse">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-border/60">
-                      <th className="py-3 px-4 font-semibold text-xs text-muted-foreground pl-6">ID</th>
                       <th className="py-3 px-4 font-semibold text-xs text-muted-foreground">Prospect Name</th>
                       <th className="py-3 px-4 font-semibold text-xs text-muted-foreground">Status</th>
                       <th className="py-3 px-4 font-semibold text-xs text-muted-foreground">Ingestion Source</th>
@@ -237,9 +280,8 @@ export default function SalesDashboardPage() {
                         </tr>
                       ))
                     ) : (
-                      leads.slice(0, 5).map((lead) => (
+                      leads.map((lead) => (
                         <tr key={lead.id} className="border-b border-border/40 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
-                          <td className="py-3.5 px-4 pl-6 font-mono text-xs font-semibold text-[#b48c3c]">{lead.id}</td>
                           <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
                             <div>
                               <p className="text-sm font-semibold">{lead.name}</p>
@@ -295,25 +337,29 @@ export default function SalesDashboardPage() {
                 <CardHeader>
                   <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     <Layers className="h-4.5 w-4.5 text-[#0F3B3D]" />
-                    Nurture Sequences
+                    Nurture Campaigns
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3.5">
-                  {mockSequences.slice(0, 2).map((seq, i) => (
-                    <div key={i} className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-semibold truncate max-w-[200px]" title={seq.name}>{seq.name}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{seq.channel}</span>
+                  {campaigns.length === 0 && !loading ? (
+                    <div className="text-xs text-muted-foreground py-4 text-center">No active campaigns found.</div>
+                  ) : (
+                    campaigns.slice(0, 2).map((seq, i) => (
+                      <div key={i} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold truncate max-w-[200px]" title={seq.name}>{seq.name}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground">{seq.channel}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                          <span>Active: <strong className="text-foreground">{seq.active}</strong> / {seq.enrolled}</span>
+                          <span className="text-green-600 font-semibold">{seq.conversionRate}% conv</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-[#b48c3c] h-full rounded-full" style={{ width: `${seq.enrolled > 0 ? (seq.active / seq.enrolled) * 100 : 0}%` }} />
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                        <span>Active: <strong className="text-foreground">{seq.active}</strong> / {seq.enrolled}</span>
-                        <span className="text-green-600 font-semibold">{seq.conversionRate}% conv</span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#b48c3c] h-full rounded-full" style={{ width: `${(seq.active / seq.enrolled) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
