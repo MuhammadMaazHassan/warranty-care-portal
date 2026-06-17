@@ -67,9 +67,29 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "healthy", timestamp: new Date() });
 });
 
-app.listen(port, () => {
-  console.log(`[Server] Standalone backend running on port ${port}`);
-  
-  // Start the background Nurture Sequence Poller (polls every 60s)
-  NurtureRunner.startWorker(60000);
+// Cron endpoint for Vercel Cron Jobs
+app.get("/api/cron/nurture", async (req, res) => {
+  try {
+    console.log("[Cron] Triggering NurtureRunner.processActiveEnrollments()...");
+    await NurtureRunner.processActiveEnrollments();
+    res.json({ success: true, timestamp: new Date() });
+  } catch (error) {
+    console.error("[Cron] Error processing nurture sequence:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
+
+// Check if running on Vercel
+if (process.env.VERCEL) {
+  console.log("[Server] Running in Vercel Serverless environment. Bypassing app.listen().");
+} else {
+  app.listen(port, () => {
+    console.log(`[Server] Standalone backend running on port ${port}`);
+    
+    // Start the background Nurture Sequence Poller (polls every 60s)
+    NurtureRunner.startWorker(60000);
+  });
+}
+
+// Export for Vercel serverless function
+export default app;
