@@ -80,34 +80,82 @@
 
 ---
 
-## 🚀 Sales Workspace Extension (SRS v1.1)
+## 🚀 Sales Workspace Extension
 
-### 🏗️ Planned Architecture Additions
-* **Workflow Orchestration:** Inngest (durable execution for CRM syncs, campaigns, CSV imports, sequences, AI agents).
-* **CRM Connector Interface:** Pluggable connector architecture starting with Salesforce v1 (REST + Bulk API 2.0).
-* **Conversational AI Agent Runtime:** Swappable engine abstraction (Inngest + Claude native tool-calling vs. Botpress).
-* **Database & Vector Isolation:** Scoped schemas/tables and Pinecone/Weaviate namespaces to isolate Sales from Warranty.
+### 🏗️ Planned Technical Additions
+* **Workflow Engine:** Use Inngest to run background tasks safely.
+  * Syncing with CRM
+  * Running campaigns
+  * Processing CSV uploads
+  * Running AI agents
+* **CRM Connection:** A system to connect outside tools.
+  * Start with Salesforce integration
+* **AI Agent Setup:** Build a system to swap between different AI tools.
+  * Claude AI vs. Botpress
+* **Data Separation:** Keep Sales data and Warranty data completely separated in the database.
 
-### 📅 Phase 3: Workspace Hub & Lead Foundation (Core Coexistence)
-- [x] **Workspace Selection & Routing (HUB-001, HUB-002, HUB-005, HUB-006)**: Create a `/hub` selector page after login, persistent switcher inside global shell navigation, distinct route prefixes (`/warranty/...` and `/sales/...`), and default last-workspace memory.
-- [x] **Context Isolation & Deployability (HUB-003, HUB-004, HUB-007, HUB-008, HUB-009)**: Add database-level scoping, tagged notifications, no Warranty logic regression, and per-tenant Sales workspace feature flag gating.
-- [x] **Lead Data Model (SW-LEAD-001 - SW-LEAD-006)**: Add PostgreSQL schemas for canonical `Lead`, custom fields, dynamic `LeadSegment`, and `LeadTimeline` (activity logger).
-- [x] **CSV Import Pipeline (SW-CSV-001 - SW-CSV-006)**: Set up CSV parser, column mapping UI, data validation/preview screen, asynchronous Inngest execution, homeowner rate limits (500 leads), and consent attestation requirement.
-- [x] **Sales Dashboard (SW-DSH-001 - SW-DSH-002)**: Build initial dashboard displaying lead statistics, sync status, and exportable CSV reporting views.
+### 📅 Phase 3: Hub & Lead Setup
+- [x] **Workspace Navigation**:
+  - Add a Hub page to pick a workspace after login
+  - Add a switcher in the top menu
+  - Remember the last workspace the user visited
+- [x] **Data Separation**:
+  - Separate database permissions
+  - Keep Warranty and Sales features independent
+- [x] **Lead Database Structure**:
+  - Store lead information
+  - Support custom fields
+  - Track lead activity timeline
+- [x] **CSV Upload Tool**:
+  - Let users upload CSV files
+  - Match CSV columns to database fields
+  - Show a preview before importing
+  - Run the import in the background
+- [x] **Sales Dashboard**:
+  - Show basic stats
+  - Show sync health
 
-### 📅 Phase 4: Integrations, Nurturing & Compliance
-- [x] **Salesforce v1 Connector (SW-CRM-001 - SW-CRM-009)**: Implement OAuth 2.0 connection management, field mapping config UI, Bulk API initial import, incremental sync cron jobs (Inngest), write-back logs, and consent mapping.
-- [x] **Central Compliance Layer (SW-NUR-006, NFR-S-005)**: Build centralized checks for SMS quiet hours, opt-in/opt-out status, suppression lists, and auto STOP/HELP handler hook.
-- [ ] **Lead Nurturing Sequences (SW-NUR-001 - SW-NUR-008)**: Develop sequence builder (1-50 steps, delay logic, send windows), automated enrollment triggers, webhook reply detection, AI content assist UI, and sequence analytics.
+### 📅 Phase 4: Integrations & Campaigns
+- [x] **Salesforce Connection**:
+  - Secure login to Salesforce
+  - Map fields between systems
+  - Import leads automatically in the background
+- [x] **Compliance Rules**:
+  - Respect SMS quiet hours
+  - Track who opted out of emails/SMS
+  - Automatically handle STOP replies
+- [x] **Drip Campaigns**:
+  - Build a tool to create multi-step email/SMS campaigns
+  - Add delays between steps
+  - Auto-enroll leads based on rules
 
-### 📅 Phase 5: Announcements, Calendar & Appointment Scheduling
-- [ ] **Builder Announcements (SW-ANN-001 - SW-ANN-007)**: Build announcement authoring UI, multi-channel batch delivery engine (email/SMS, chunking, throttling, automatic retry, DLQ), and geo-targeting logic.
-- [ ] **Content Calendar (SW-CAL-001 - SW-CAL-005)**: Implement calendar views (month, week, list) showing scheduled announcements, blog posts, and campaigns with drag-and-drop rescheduling.
-- [ ] **Appointment Scheduling - Simple Mode (SW-APT-001 - SW-APT-005, SW-APT-007)**: Set up user availability configuration (hours, buffer times, time zone) and link-based booking flow with double-booking prevention.
+### 📅 Phase 5: Announcements & Calendar
+- [x] **Mass Announcements**:
+  - Create a tool to write mass emails/SMS
+  - Send large batches safely without getting blocked
+  - Filter recipients by location
+- [x] **Content Calendar**:
+  - Show a visual calendar of all scheduled sends
+  - Let users drag and drop to reschedule
+- [x] **Basic Appointment Booking**:
+  - Let agents set their working hours
+  - Let leads book times through a simple link
+  - Prevent double bookings
 
-### 📅 Phase 6: Advanced AI Agents & Automations
-- [ ] **Conversational AI Booking Agent (SW-APT-002 - SW-APT-006)**: Build Next.js / Inngest / Claude-driven tool-calling scheduling agent responding to inbound emails/SMS, proposing slots, and handling counter-proposals with a 4-turn human escalation threshold.
-- [ ] **News Scraping Agent (SW-NEWS-001 - SW-NEWS-006)**: Create RSS/Atom web scraper with daily collection schedules, AI deduplication/summarization, and compliance logic.
-- [ ] **Blog Post Drafting Pipeline (SW-BLOG-001 - SW-BLOG-006)**: Set up LLM blog generator using scraped news feed, rich-text editor for manual review, and export/publishing endpoints.
-- [ ] **Campaign Automation Rules (SW-AMK-001 - SW-AMK-005)**: Implement trigger-condition-action workflow engine, drag-and-drop builder with validation, rate limits, and loop-prevention cooldowns.
-- [ ] **Sales Agent Knowledge Base (SW-KB-001 - SW-KB-007)**: Support drag-and-drop PDF/DOCX indexing to Sales namespace in Pinecone/Weaviate (RAG), category tagging, citation visibility, and company voice profile injection.
+### 📅 Phase 6: Advanced AI Features
+- [ ] **AI Booking Agent**:
+  - Build an AI that reads emails/SMS from leads
+  - Let the AI suggest available meeting times
+  - Automatically book the meeting if the lead agrees
+- [x] **News Fetcher**:
+  - Automatically collect housing news every day
+  - Use AI to summarize the news
+- [x] **AI Blog Writer**:
+  - Let AI write draft blog posts based on the news
+  - Add a text editor to review the drafts before publishing
+- [x] **Smart Automations**:
+  - Build rules like "If a lead replies, do X"
+  - Prevent rules from running in endless loops
+- [x] **Sales AI Knowledge Base**:
+  - Let users upload PDFs and Word docs
+  - Feed these documents to the AI to train it on company policies

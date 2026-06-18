@@ -169,7 +169,11 @@ export const updateTicket = async (req, res) => {
     // Get old ticket to check if status changed and verify company
     const oldTicket = await prisma.ticket.findUnique({
       where: { id },
-      include: { homeowner: true }
+      include: { 
+        homeowner: {
+          include: { company: true }
+        } 
+      }
     });
 
     if (!oldTicket) {
@@ -215,7 +219,8 @@ export const updateTicket = async (req, res) => {
               oldTicket.homeowner.email,
               oldTicket.homeowner.name || "Homeowner",
               ticket.id,
-              status
+              status,
+              oldTicket.homeowner.company
             );
             
             if (!mailResult.success) {

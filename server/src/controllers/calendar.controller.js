@@ -7,12 +7,79 @@ export const getCalendarEvents = async (req, res) => {
       return res.status(403).json({ message: "No company associated" });
     }
 
-    const events = await prisma.contentCalendar.findMany({
+    const manualEvents = await prisma.contentCalendar.findMany({
       where: { companyId: req.user.companyId },
       orderBy: { scheduledAt: "asc" },
     });
 
-    return res.json(events);
+    const activeEnrollments = await prisma.campaignEnrollment.findMany({
+      where: {
+        campaign: { companyId: req.user.companyId },
+        status: "ACTIVE",
+        nextRunAt: { not: null }
+      },
+      include: {
+        campaign: {
+          include: {
+            steps: {
+              orderBy: { position: "asc" }
+            }
+          }
+        }
+      }
+    });
+
+    // Group enrollments by date and campaign step
+    const groupedCampaigns = {};
+
+    for (const enrollment of activeEnrollments) {
+      if (!enrollment.createdAt) continue;
+
+      // Project the entire campaign timeline from the moment they enrolled
+      let currentSimTime = new Date(enrollment.createdAt);
+
+      for (const step of enrollment.campaign.steps) {
+        if (step.type === "DELAY") {
+          // Advance the simulation time
+          if (step.delayUnit === "DAYS") {
+            currentSimTime.setDate(currentSimTime.getDate() + (step.delayValue || 0));
+          } else if (step.delayUnit === "HOURS") {
+            currentSimTime.setHours(currentSimTime.getHours() + (step.delayValue || 0));
+          } else if (step.delayUnit === "MINUTES") {
+            currentSimTime.setMinutes(currentSimTime.getMinutes() + (step.delayValue || 0));
+          }
+        } else {
+          // It's an executable step (EMAIL/SMS), project it onto the calendar
+          const dateString = currentSimTime.toISOString().split('T')[0];
+          const isCompleted = step.position <= enrollment.currentStepPosition;
+          const key = `${enrollment.campaignId}_${step.id}_${dateString}_${isCompleted}`;
+
+          if (!groupedCampaigns[key]) {
+            groupedCampaigns[key] = {
+              id: key,
+              title: `${enrollment.campaign.name} - Step ${step.position} (1 Send)`,
+              count: 1,
+              channel: step.type === "EMAIL" ? "Email" : "SMS",
+              scheduledAt: new Date(dateString),
+              isAiSuggested: false,
+              type: "campaign_aggregation",
+              isCompleted: isCompleted
+            };
+          } else {
+            groupedCampaigns[key].count += 1;
+            groupedCampaigns[key].title = `${enrollment.campaign.name} - Step ${step.position} (${groupedCampaigns[key].count} Sends)`;
+          }
+        }
+      }
+    }
+
+    const campaignEvents = Object.values(groupedCampaigns);
+    const allEvents = [...manualEvents, ...campaignEvents];
+
+    // Optionally sort by date
+    allEvents.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+
+    return res.json(allEvents);
   } catch (error) {
     console.error("[Calendar GET] Error:", error);
     return res.status(500).json({ message: "Internal server error" });

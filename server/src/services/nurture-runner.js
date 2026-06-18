@@ -226,6 +226,8 @@ export class NurtureRunner {
               to: lead.email,
               subject,
               html: formattedHtml,
+              fromName: lead.company?.name || undefined,
+              fromEmail: lead.company?.email || undefined,
             });
 
             await prisma.leadTimeline.create({

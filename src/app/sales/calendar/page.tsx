@@ -1,52 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PortalLayout from "@/components/layout/PortalLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Sparkles,
   Mail,
   MessageSquare,
-  BookmarkCheck,
-  CheckCircle2,
-  ListFilter
+  Bell,
+  CheckCircle2
 } from "lucide-react";
-import { motion } from "framer-motion";
 
 const mockAISuggestions = [
   { id: "S-1", topic: "Post-COE Followup Survey", channel: "Email", date: "June 18", reason: "Gap detected: 14 days without customer contact post COE", outline: "Drip campaign trigger to gather testimonials and survey responses." },
   { id: "S-2", topic: "Mortgage Interest Rate Drop Alert", channel: "SMS", date: "June 20", reason: "News Trigger: Interest rates dropped below 5.8%", outline: "Broadcast SMS alert to cold leads detailing updated monthly estimates." }
 ];
 
-const mockCalendarEvents = [
-  { day: 3, title: "Newsletter Email", channel: "Email" },
-  { day: 12, title: "Model Home Tour", channel: "SMS" },
-  { day: 15, title: "Rate Drop Alert", channel: "SMS" },
-  { day: 22, title: "Resale Campaign", channel: "Email" },
-];
-
 export default function ContentCalendarPage() {
   const [suggestions, setSuggestions] = useState(mockAISuggestions);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const res = await fetch("/api/sales/calendar");
+        if (res.ok) {
+          const data = await res.json();
+          setEvents(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch calendar events", err);
+      }
+    };
+    fetchEvents();
+  }, []);
 
   const handleApproveSuggestion = (id: string) => {
     setSuggestions(prev => prev.filter(s => s.id !== id));
     alert("Suggestion approved and converted to draft calendar slot!");
   };
 
-  // Basic calendar matrix for June 2026 (starts on Monday, 30 days)
-  const daysArray = Array.from({ length: 30 }, (_, i) => i + 1);
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+  // Adjust so Monday is 0 and Sunday is 6
+  const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+
+  const monthName = currentDate.toLocaleString('default', { month: 'long' });
+  const year = currentDate.getFullYear();
 
   return (
     <ProtectedRoute allowedRoles={["admin", "staff"]}>
       <PortalLayout workspace="sales">
-        <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="space-y-6 max-w-7xl mx-auto relative">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -57,88 +73,119 @@ export default function ContentCalendarPage() {
                 Monitor and reschedule upcoming campaigns, broadcasts, and blog publishes.
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="gap-2 h-9"><ListFilter className="h-4 w-4" /> Filter</Button>
-              <Button className="bg-[#b48c3c] text-white hover:bg-[#b48c3c]/90 gap-2 h-9 border-none">
-                <Plus className="h-4 w-4" /> Schedule Send
-              </Button>
+            <div className="flex gap-2 items-center">
+              {/* Notification Bell Dropdown */}
+              <div className="relative">
+                <Button
+                  onClick={() => setShowSuggestions(!showSuggestions)}
+                  variant="outline"
+                  className="relative h-9 w-9 border-indigo-200 text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 dark:border-indigo-900/50 dark:bg-indigo-900/20"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {suggestions.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-slate-900"></span>
+                    </span>
+                  )}
+                </Button>
+
+                {showSuggestions && (
+                  <div className="absolute right-0 top-11 z-50 w-[320px] sm:w-[380px] bg-white dark:bg-slate-950 border dark:border-slate-800 rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="p-4 border-b dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
+                      <h3 className="font-bold flex items-center gap-2 text-sm">
+                        <Sparkles className="h-4 w-4 text-indigo-500" />
+                        AI Suggested Slots
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">Identified outreach gaps & local events</p>
+                    </div>
+                    <div className="p-4 max-h-[400px] overflow-y-auto space-y-3">
+                      {suggestions.length > 0 ? (
+                        suggestions.map((s) => (
+                          <div key={s.id} className="p-3 border dark:border-slate-800 bg-white dark:bg-slate-950 rounded-xl space-y-2 shadow-sm">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-semibold">{s.channel}</Badge>
+                              <span className="text-slate-400 font-bold">{s.date}</span>
+                            </div>
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{s.topic}</h4>
+                            <p className="text-xs text-muted-foreground">{s.outline}</p>
+                            <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold italic">★ {s.reason}</p>
+                            <Button
+                              onClick={() => handleApproveSuggestion(s.id)}
+                              className="w-full h-8 text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg mt-2"
+                            >
+                              Approve Suggestion
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-center text-slate-400 py-6">All suggestions processed.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left: AI suggestions */}
-            <div className="space-y-6 lg:col-span-1">
-              <Card className="border-indigo-500/20 bg-linear-to-br from-white to-indigo-500/5 dark:from-slate-900 dark:to-slate-900/40">
-                <CardHeader className="pb-3 border-b dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-500" />
-                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100">AI Suggested Slots</CardTitle>
-                  </div>
-                  <CardDescription className="text-[10px]">Identified outreach gaps & local events</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                  {suggestions.length > 0 ? (
-                    suggestions.map((s) => (
-                      <div key={s.id} className="p-3 border dark:border-slate-800 bg-white/50 dark:bg-slate-950/20 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-semibold">{s.channel}</Badge>
-                          <span className="text-slate-400 font-bold">{s.date}</span>
-                        </div>
-                        <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200">{s.topic}</h4>
-                        <p className="text-[9px] text-muted-foreground">{s.outline}</p>
-                        <p className="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold italic">★ {s.reason}</p>
-                        <Button
-                          onClick={() => handleApproveSuggestion(s.id)}
-                          className="w-full h-7 text-[10px] font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg"
-                        >
-                          Approve Suggestion
-                        </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-center text-slate-400 py-6">All suggestions processed.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right: The Grid */}
-            <div className="lg:col-span-3 space-y-4">
+          <div className="w-full">
+            <div className="space-y-4">
               <Card>
                 <CardHeader className="flex flex-row justify-between items-center p-4 border-b">
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-5 w-5 text-[#b48c3c]" />
-                    <span className="font-bold text-sm">June 2026</span>
+                    <span className="font-bold text-sm">{monthName} {year}</span>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="grid grid-cols-7 text-center border-b dark:border-slate-800 text-xs font-semibold text-slate-400 py-2">
                     <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
                   </div>
-                  <div className="grid grid-cols-7 min-h-[450px]">
-                    {daysArray.map((day) => {
-                      const events = mockCalendarEvents.filter(e => e.day === day);
+                  <div className="grid grid-cols-7 min-h-[650px]">
+                    {Array.from({ length: startOffset }).map((_, i) => (
+                      <div key={`empty-${i}`} className="border-r border-b dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/5" />
+                    ))}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const day = i + 1;
+                      const currentMonthEvents = events.filter(e => {
+                        if (!e.scheduledAt) return false;
+                        const evtDate = new Date(e.scheduledAt);
+                        return evtDate.getFullYear() === currentDate.getFullYear() &&
+                          evtDate.getMonth() === currentDate.getMonth() &&
+                          evtDate.getDate() === day;
+                      });
+
                       return (
                         <div key={day} className="border-r border-b dark:border-slate-800 p-2 text-left space-y-1.5 flex flex-col justify-between hover:bg-slate-50/20 dark:hover:bg-slate-900/10 transition">
                           <span className="text-[10px] font-bold text-slate-400">{day}</span>
                           <div className="space-y-1 flex-1">
-                            {events.map((evt, idx) => (
-                              <div
-                                key={idx}
-                                className={`text-[9px] p-1 rounded font-medium border flex items-center gap-0.5 truncate ${
-                                  evt.channel === "Email"
-                                    ? "bg-blue-50 text-blue-800 border-blue-100 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900/20"
-                                    : "bg-amber-50 text-amber-800 border-amber-100 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/20"
-                                }`}
-                              >
-                                {evt.channel === "Email" ? <Mail className="h-2.5 w-2.5 shrink-0" /> : <MessageSquare className="h-2.5 w-2.5 shrink-0" />}
-                                <span className="truncate">{evt.title}</span>
-                              </div>
-                            ))}
+                            {currentMonthEvents.map((evt, idx) => {
+                              const isDone = evt.isCompleted || evt.status === "Sent" || evt.status === "Published";
+                              return (
+                                <div
+                                  key={evt.id || idx}
+                                  className={`text-[9px] p-1 rounded font-medium border flex items-center gap-0.5 truncate ${isDone
+                                    ? "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-800"
+                                    : evt.channel?.includes("Email")
+                                      ? "bg-blue-50 text-blue-800 border-blue-100 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900/20"
+                                      : "bg-amber-50 text-amber-800 border-amber-100 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/20"
+                                    }`}
+                                >
+                                  {isDone ? (
+                                    <CheckCircle2 className="h-2.5 w-2.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+                                  ) : evt.channel?.includes("Email") ? (
+                                    <Mail className="h-2.5 w-2.5 shrink-0" />
+                                  ) : (
+                                    <MessageSquare className="h-2.5 w-2.5 shrink-0" />
+                                  )}
+                                  <span className={`truncate ${isDone ? "line-through opacity-80" : ""}`}>{evt.title}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

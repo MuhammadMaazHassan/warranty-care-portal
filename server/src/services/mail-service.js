@@ -18,15 +18,19 @@ export class MailService {
     },
   });
 
-  static async sendEmail({ to, subject, html }) {
+  static async sendEmail({ to, subject, html, fromName, fromEmail }) {
     if (!this.SMTP_USER || !this.SMTP_PASS) {
       console.warn("[Mail Service] SMTP credentials (SMTP_USER/SMTP_PASS) are not set. Email will not be sent.");
       return { success: false, error: "SMTP credentials missing" };
     }
 
+    const senderName = fromName || this.SENDER_NAME;
+    const senderEmail = fromEmail || this.SENDER_EMAIL;
+    const fromString = `"${senderName}" <${senderEmail}>`;
+
     try {
       const info = await this.transporter.sendMail({
-        from: `"${this.SENDER_NAME}" <${this.SENDER_EMAIL}>`,
+        from: fromString,
         to,
         subject,
         html,
@@ -40,9 +44,13 @@ export class MailService {
     }
   }
 
-  static async sendTicketStatusUpdate(to, homeownerName, ticketId, status) {
+  static async sendTicketStatusUpdate(to, homeownerName, ticketId, status, company = null) {
     const statusLabel = status.replace("_", " ").toLowerCase();
     const subject = `Ticket Update: ${ticketId} is now ${statusLabel}`;
+    
+    const companyName = company?.name || "Ai.Lumen Warranty Care";
+    const companyEmail = company?.email || this.SENDER_EMAIL;
+    const portalUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
@@ -57,19 +65,19 @@ export class MailService {
           </div>
           <p>Our team is working to resolve this as quickly as possible. You can track the progress of your claim in the portal.</p>
           <div style="text-align: center; margin-top: 30px;">
-            <a href="https://warranty-portal.bitzsol.com/warranty/tickets/${ticketId}" 
+            <a href="${portalUrl}/warranty/tickets/${ticketId}" 
                style="background: #b48c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                View Ticket in Portal
             </a>
           </div>
         </div>
         <div style="background: #f4f4f4; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-          <p>&copy; 2026 Ai.Lumen Warranty Care. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
         </div>
       </div>
     `;
 
-    return this.sendEmail({ to, subject, html });
+    return this.sendEmail({ to, subject, html, fromName: companyName, fromEmail: companyEmail });
   }
 
   static async sendVerificationOtp(to, otp) {
