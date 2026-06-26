@@ -87,6 +87,16 @@ export const bookAppointment = async (req, res) => {
       },
     });
 
+    // Notify Inngest to cancel active campaigns
+    const { inngest } = await import("../lib/inngest.js");
+    await inngest.send({
+      name: "campaign.exit",
+      data: {
+        leadId,
+        reason: "APPOINTMENT"
+      }
+    });
+
     return res.status(201).json(appointment);
   } catch (error) {
     console.error("[Appointment Book] Error:", error);

@@ -72,16 +72,23 @@ export default function SalesDashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [leadsRes, campaignsRes] = await Promise.all([
+        const [dashboardRes, leadsRes, campaignsRes] = await Promise.all([
+          fetch("/api/sales/dashboard"),
           fetch("/api/sales/leads"),
           fetch("/api/sales/campaigns")
         ]);
 
+        if (dashboardRes.ok) {
+          const data = await dashboardRes.json();
+          setStats(s => ({
+            ...s,
+            totalLeads: data.leads?.total || 0,
+            activeCampaigns: data.campaigns?.activeCount || 0,
+          }));
+        }
+
         if (leadsRes.ok) {
           const allLeadsData = await leadsRes.json();
-          setStats(s => ({ ...s, totalLeads: allLeadsData.length }));
-          
-          // Use first 5 for recent leads table
           setLeads(allLeadsData.slice(0, 5).map((l: any) => ({
             id: `L-${l.id.slice(-4).toUpperCase()}`,
             name: `${l.firstName} ${l.lastName}`,
@@ -96,12 +103,10 @@ export default function SalesDashboardPage() {
 
         if (campaignsRes.ok) {
           const campaignsData = await campaignsRes.json();
-          let activeCamps = 0;
           let enrolledCamps = 0;
           const mappedCamps = campaignsData.map((c: any) => {
             const totalEnrollments = c.enrollments?.length || 0;
             const activeEnrollments = c.enrollments?.filter((e: any) => e.status === "ACTIVE").length || 0;
-            if (c.status === "Active") activeCamps++;
             enrolledCamps += totalEnrollments;
             return {
               name: c.name,
@@ -112,9 +117,8 @@ export default function SalesDashboardPage() {
             };
           });
           setCampaigns(mappedCamps);
-          setStats(s => ({ ...s, activeCampaigns: activeCamps, totalEnrolled: enrolledCamps }));
+          setStats(s => ({ ...s, totalEnrolled: enrolledCamps }));
         }
-
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
       } finally {
@@ -138,18 +142,7 @@ export default function SalesDashboardPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ["Lead ID", "Name", "Email", "Phone", "Status", "Source", "Owner", "Ingested Date"];
-    const rows = leads.map(l => [l.id, l.name, l.email, l.phone, l.status, l.source, l.owner, l.date]);
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `sales_leads_export_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open("/api/sales/dashboard/export?type=leads", "_blank");
   };
 
   return (

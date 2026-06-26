@@ -20,7 +20,7 @@ export default function Home() {
           return null;
         };
         const cookieLastWorkspace = getCookie("last-workspace");
-        const lastWorkspace = storedLastWorkspace || cookieLastWorkspace;
+        const lastWorkspace = user.lastActiveWorkspace || storedLastWorkspace || cookieLastWorkspace;
 
         if (lastWorkspace === "warranty" && user.hasWarrantyAccess) {
           router.push("/warranty/dashboard");

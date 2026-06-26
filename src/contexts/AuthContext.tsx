@@ -37,6 +37,7 @@ export interface User {
   lastSeen?: Date;
   hasWarrantyAccess: boolean;
   hasSalesAccess: boolean;
+  lastActiveWorkspace?: string;
 }
 
 interface AuthContextType {

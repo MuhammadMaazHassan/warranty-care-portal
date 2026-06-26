@@ -420,11 +420,24 @@ export const updateLead = async (req, res) => {
       }
     }
 
-    updateData.timeline = {
-      create: {
+    const timelineEntries = [];
+
+    if (status !== undefined && status !== lead.status) {
+      timelineEntries.push({
+        type: "STATUS_CHANGE",
+        description: `Lead status changed from '${lead.status}' to '${status}' by ${req.user.name || req.user.email}`,
+      });
+    }
+
+    if (timelineEntries.length === 0) {
+      timelineEntries.push({
         type: "SYNC_UPDATE",
         description: `Lead updated by ${req.user.name || req.user.email}`,
-      },
+      });
+    }
+
+    updateData.timeline = {
+      create: timelineEntries,
     };
 
     const updatedLead = await prisma.lead.update({

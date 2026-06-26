@@ -307,7 +307,7 @@ export default function LeadsPage() {
       });
 
       // 2. Call API
-      const res = await fetch("/api/sales/leads/import", {
+      const res = await fetch("/api/sales/csv/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -350,18 +350,16 @@ export default function LeadsPage() {
     setTimelineEvents([]);
     setLoadingTimeline(true);
     try {
-      // Mock fetch timeline / in a real system we fetch from `/api/sales/leads/${id}/timeline`
-      // For this wizard let's check or mock it
-      setTimeout(() => {
-        setTimelineEvents([
-          { type: "IMPORT", description: `Lead synchronized from ${lead.source} source`, createdAt: lead.createdAt },
-          lead.emailOptIn || lead.smsOptIn
-            ? { type: "CONSENT_CHANGE", description: `Subscribed with consent logged via ${lead.consentSource || "System"}`, createdAt: lead.createdAt }
-            : null
-        ].filter(Boolean));
-        setLoadingTimeline(false);
-      }, 500);
+      const res = await fetch(`/api/sales/leads/${lead.id}/timeline`);
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineEvents(data);
+      } else {
+        showToast("Failed to load timeline.");
+      }
     } catch {
+      showToast("Error loading timeline.");
+    } finally {
       setLoadingTimeline(false);
     }
   };

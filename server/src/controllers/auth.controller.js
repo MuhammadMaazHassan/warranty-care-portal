@@ -62,11 +62,12 @@ export const updateProfile = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { name, avatar, email } = req.body;
+    const { name, avatar, email, lastActiveWorkspace } = req.body;
 
     const updateData = {};
     if (name) updateData.name = name;
     if (avatar !== undefined) updateData.avatar = avatar;
+    if (lastActiveWorkspace) updateData.lastActiveWorkspace = lastActiveWorkspace;
 
     if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
       const emailLower = email.toLowerCase();
@@ -123,6 +124,7 @@ export const updateProfile = async (req, res) => {
         role: true,
         companyId: true,
         avatar: true,
+        lastActiveWorkspace: true,
       },
     });
 

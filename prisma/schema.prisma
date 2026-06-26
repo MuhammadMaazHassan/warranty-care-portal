@@ -40,6 +40,7 @@ model User {
   knowledgeBaseId   String?
   hasWarrantyAccess Boolean            @default(true)
   hasSalesAccess    Boolean            @default(false)
+  lastActiveWorkspace String?          @default("warranty")
   ownedLeads        Lead[]             @relation("LeadOwner")
   agentAppointments SalesAppointment[] @relation("AgentAppointments")
   createdAt         DateTime           @default(now())
@@ -67,6 +68,7 @@ model Company {
   voiceProfile          String?                 @default("professional")
   maxSmsPerHour         Int                     @default(60)
   complianceOptInRequired Boolean               @default(true)
+  salesEnabled          Boolean                 @default(true)
   suppressionList       SuppressionList[]
   campaigns             Campaign[]
   emailTemplates        EmailTemplate[]

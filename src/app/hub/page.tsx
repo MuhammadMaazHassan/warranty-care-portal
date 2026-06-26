@@ -11,7 +11,7 @@ import { Bot, Layers, Sun, Moon, LogOut, CheckCircle2, Lock } from "lucide-react
 import { motion } from "framer-motion";
 
 export default function HubPage() {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, updateProfile } = useAuth();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -34,10 +34,16 @@ export default function HubPage() {
     );
   }
 
-  const handleSelectWorkspace = (workspace: "warranty" | "sales") => {
+  const handleSelectWorkspace = async (workspace: "warranty" | "sales") => {
     // Save selection in memory (both localStorage and cookies for middleware accessibility)
     localStorage.setItem("last-workspace", workspace);
     document.cookie = `last-workspace=${workspace}; path=/; max-age=31536000; SameSite=Lax`;
+
+    try {
+      await updateProfile({ lastActiveWorkspace: workspace });
+    } catch (err) {
+      console.error("Failed to update last active workspace", err);
+    }
 
     // Redirect to the workspace dashboard
     router.push(`/${workspace}/dashboard`);

@@ -74,7 +74,63 @@ export const getCampaignDetail = async (req, res) => {
       return res.status(404).json({ message: "Campaign not found" });
     }
 
-    return res.json(campaign);
+    // Analytics Calculation
+    const enrollments = campaign.enrollments;
+    const analytics = {
+      enrolled: enrollments.length,
+      active: enrollments.filter((e) => e.status === "ACTIVE" || e.status === "PAUSED").length,
+      completed: enrollments.filter((e) => e.status === "COMPLETED").length,
+      exited: enrollments.filter((e) => e.status === "EXITED").length,
+      exitedByReason: {
+        REPLY: enrollments.filter((e) => e.status === "EXITED" && e.exitedReason === "REPLY").length,
+        APPOINTMENT: enrollments.filter((e) => e.status === "EXITED" && e.exitedReason === "APPOINTMENT").length,
+        UNSUBSCRIBE: enrollments.filter((e) => e.status === "EXITED" && e.exitedReason === "UNSUBSCRIBE").length,
+        SUPPRESSED: enrollments.filter((e) => e.status === "EXITED" && e.exitedReason === "SUPPRESSED").length,
+      },
+    };
+
+    // Calculate per-step analytics
+    const stepAnalytics = {};
+    for (const step of campaign.steps) {
+      stepAnalytics[step.id] = {
+        sent: 0,
+        delivered: 0,
+        opened: 0,
+        clicked: 0,
+        replied: 0,
+        bounced: 0,
+        unsubscribed: 0
+      };
+    }
+
+    // Query timeline events to count sends, etc.
+    const timelineEvents = await prisma.leadTimeline.findMany({
+      where: {
+        leadId: { in: enrollments.map((e) => e.leadId) },
+        type: { in: ["EMAIL_SENT", "SMS_SENT", "SMS_FAILED"] }
+      }
+    });
+
+    timelineEvents.forEach((event) => {
+      const stepPos = event.metadata?.stepPosition;
+      const step = campaign.steps.find(s => s.position === stepPos);
+      if (step) {
+        if (event.type === "EMAIL_SENT" || event.type === "SMS_SENT") {
+          stepAnalytics[step.id].sent++;
+          // Assuming successful send = delivered for MVP, real webhooks would update this
+          stepAnalytics[step.id].delivered++;
+        }
+        if (event.type === "SMS_FAILED") {
+          stepAnalytics[step.id].bounced++;
+        }
+      }
+    });
+
+    return res.json({
+      ...campaign,
+      analytics,
+      stepAnalytics
+    });
   } catch (error) {
     console.error("[Campaign Detail] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -262,6 +318,7 @@ export const enrollCampaign = async (req, res) => {
     if (!req.user || !req.user.companyId) {
       return res.status(403).json({ message: "No company associated" });
     }
+    const { inngest } = await import("../lib/inngest.js");
 
     const { id } = req.params;
     const { leadIds } = req.body;
@@ -319,24 +376,8 @@ export const enrollCampaign = async (req, res) => {
           concurrentWarnings.push(leadId);
         }
 
-        let initialStepPosition = 0;
-        let nextRunAt = new Date();
-
-        if (firstStep && firstStep.type === "DELAY") {
-          initialStepPosition = 1;
-          const value = firstStep.delayValue || 0;
-          const unit = (firstStep.delayUnit || "DAYS").toUpperCase();
-          if (unit === "MINUTES" || unit === "MINUTE") {
-            nextRunAt.setMinutes(nextRunAt.getMinutes() + value);
-          } else if (unit === "HOURS" || unit === "HOUR") {
-            nextRunAt.setHours(nextRunAt.getHours() + value);
-          } else {
-            nextRunAt.setDate(nextRunAt.getDate() + value);
-          }
-        }
-
-        // Upsert enrollment to start at step 0 immediately (or step 1 if delayed)
-        await prisma.campaignEnrollment.upsert({
+        // Upsert enrollment to start at step 0 immediately
+        const enrollment = await prisma.campaignEnrollment.upsert({
           where: {
             leadId_campaignId: {
               leadId,
@@ -347,14 +388,22 @@ export const enrollCampaign = async (req, res) => {
             leadId,
             campaignId: id,
             status: "ACTIVE",
-            currentStepPosition: initialStepPosition,
-            nextRunAt,
+            currentStepPosition: 1,
           },
           update: {
             status: "ACTIVE",
-            currentStepPosition: initialStepPosition,
-            nextRunAt,
+            currentStepPosition: 1,
             exitedReason: null,
+          },
+        });
+
+        // Fire the Inngest event
+        await inngest.send({
+          name: "campaign.enroll",
+          data: {
+            leadId,
+            campaignId: id,
+            enrollmentId: enrollment.id,
           },
         });
 

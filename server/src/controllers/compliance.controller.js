@@ -243,6 +243,9 @@ export const processInbound = async (req, res) => {
             metadata: { body, channel, sender },
           },
         });
+
+        const { inngest } = await import("../lib/inngest.js");
+        await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "REPLY" } });
       }
 
       return res.json({
@@ -321,47 +324,9 @@ export const processTwilioInboundSms = async (req, res) => {
           },
         });
 
-        // Exit active campaigns with reason REPLY
-        const activeEnrollments = await prisma.campaignEnrollment.findMany({
-          where: {
-            leadId: lead.id,
-            status: "ACTIVE",
-          },
-        });
-
-        if (activeEnrollments.length > 0) {
-          await prisma.campaignEnrollment.updateMany({
-            where: {
-              leadId: lead.id,
-              status: "ACTIVE",
-            },
-            data: {
-              status: "EXITED",
-              exitedReason: "REPLY",
-            },
-          });
-
-          // Check if any campaigns should be marked Ready because they have no active enrollments left
-          for (const enrollment of activeEnrollments) {
-            try {
-              const activeCount = await prisma.campaignEnrollment.count({
-                where: {
-                  campaignId: enrollment.campaignId,
-                  status: { in: ["ACTIVE", "PAUSED"] }
-                }
-              });
-
-              if (activeCount === 0) {
-                await prisma.campaign.update({
-                  where: { id: enrollment.campaignId },
-                  data: { status: "Ready" }
-                });
-              }
-            } catch (completionErr) {
-              console.error(`[Twilio Webhook] Error checking completion for campaign ${enrollment.campaignId}:`, completionErr);
-            }
-          }
-        }
+        // Exit active campaigns with reason REPLY via Inngest
+        const { inngest } = await import("../lib/inngest.js");
+        await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "REPLY" } });
       }
     }
 
@@ -479,6 +444,9 @@ export const unsubscribeWebhook = async (req, res) => {
           metadata: { email, phone, companyId },
         },
       });
+
+      const { inngest } = await import("../lib/inngest.js");
+      await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "UNSUBSCRIBE" } });
     }
 
     return res.json({
@@ -544,48 +512,9 @@ export const processBrevoInboundEmail = async (req, res) => {
           },
         });
 
-        // Find active campaign enrollments to exit
-        const activeEnrollments = await prisma.campaignEnrollment.findMany({
-          where: {
-            leadId: lead.id,
-            status: "ACTIVE",
-          },
-        });
-
-        if (activeEnrollments.length > 0) {
-          await prisma.campaignEnrollment.updateMany({
-            where: {
-              leadId: lead.id,
-              status: "ACTIVE",
-            },
-            data: {
-              status: "EXITED",
-              exitedReason: "REPLY",
-            },
-          });
-
-          // Check campaign completion for each campaign
-          for (const enrollment of activeEnrollments) {
-            try {
-              const activeCount = await prisma.campaignEnrollment.count({
-                where: {
-                  campaignId: enrollment.campaignId,
-                  status: { in: ["ACTIVE", "PAUSED"] }
-                }
-              });
-
-              if (activeCount === 0) {
-                await prisma.campaign.update({
-                  where: { id: enrollment.campaignId },
-                  data: { status: "Ready" }
-                });
-                console.log(`[Brevo Webhook] Campaign ${enrollment.campaignId} marked as Ready because all enrollments are finished.`);
-              }
-            } catch (completionErr) {
-              console.error(`[Brevo Webhook] Error checking completion for campaign ${enrollment.campaignId}:`, completionErr);
-            }
-          }
-        }
+        // Exit active campaigns with reason REPLY via Inngest
+        const { inngest } = await import("../lib/inngest.js");
+        await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "REPLY" } });
       }
 
       processedCount++;

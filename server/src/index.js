@@ -10,6 +10,9 @@ import campaignsRouter from "./routes/campaigns.js";
 import calendarRouter from "./routes/calendar.js";
 import kbRouter from "./routes/kb.js";
 import appointmentsRouter from "./routes/appointments.js";
+import segmentsRouter from "./routes/segments.js";
+import csvRouter from "./routes/csv.js";
+import salesDashboardRouter from "./routes/sales-dashboard.js";
 
 // Core Warranty Routes
 import dashboardRouter from "./routes/dashboard.js";
@@ -24,8 +27,11 @@ import communitiesRouter from "./routes/communities.js";
 import homeownersRouter from "./routes/homeowners.js";
 import usersRouter from "./routes/users.js";
 
-import { NurtureRunner } from "./services/nurture-runner.js";
 import { initSms } from "./services/sms.service.js";
+import { serve } from "inngest/express";
+import { inngest } from "./lib/inngest.js";
+import { runNurtureCampaign, handleCampaignExit } from "./inngest/functions/nurture.js";
+import { handleCsvImport } from "./inngest/functions/csv-import.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -49,6 +55,9 @@ app.use("/api/sales/campaigns", campaignsRouter);
 app.use("/api/sales/calendar", calendarRouter);
 app.use("/api/sales/kb", kbRouter);
 app.use("/api/sales/appointments", appointmentsRouter);
+app.use("/api/sales/segments", segmentsRouter);
+app.use("/api/sales/csv", csvRouter);
+app.use("/api/sales/dashboard", salesDashboardRouter);
 
 // Core Warranty Route Mounts
 app.use("/api/dashboard", dashboardRouter);
@@ -63,34 +72,22 @@ app.use("/api/communities", communitiesRouter);
 app.use("/api/homeowners", homeownersRouter);
 app.use("/api/users", usersRouter);
 
+// Inngest Endpoint
+app.use("/api/inngest", serve({ client: inngest, functions: [runNurtureCampaign, handleCampaignExit, handleCsvImport] }));
+
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({ status: "healthy", timestamp: new Date() });
 });
 
-// Cron endpoint for Vercel Cron Jobs
-app.get("/api/cron/nurture", async (req, res) => {
-  try {
-    console.log("[Cron] Triggering NurtureRunner.processActiveEnrollments()...");
-    await NurtureRunner.processActiveEnrollments();
-    res.json({ success: true, timestamp: new Date() });
-  } catch (error) {
-    console.error("[Cron] Error processing nurture campaign:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Check if running on Vercel
-if (process.env.VERCEL) {
-  console.log("[Server] Running in Vercel Serverless environment. Bypassing app.listen().");
+// Check if running on Vercel or Test
+if (process.env.VERCEL || process.env.NODE_ENV === "test") {
+  console.log("[Server] Running in Vercel/Test environment. Bypassing app.listen().");
 } else {
   app.listen(port, () => {
     console.log(`[Server] Standalone backend running on port ${port}`);
     // Initialize SMS service
     initSms();
-    
-    // Start the background Nurture Campaign Poller (polls every 10s)
-    NurtureRunner.startWorker(10000);
   });
 }
 
