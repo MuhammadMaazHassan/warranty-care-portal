@@ -16,7 +16,7 @@ export async function getERPConfig(
   const record = await prisma.integration.findFirst({
     where: { companyId, platform, isActive: true },
   });
-  if (!record) return null;
+  if (!record || !record.apiKey) return null;
   return {
     apiKey: record.apiKey,
     secretKey: record.secretKey || undefined,
