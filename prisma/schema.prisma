@@ -82,11 +82,18 @@ model Integration {
   id          String   @id @default(cuid())
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id])
-  platform    String   // "BUILTOPIA", "BUILDERTREND", etc.
-  apiKey      String
+  platform    String   // "BUILTOPIA", "BUILDERTREND", "BREVO_EMAIL", "BREVO_SMS", "TWILIO"
+  apiKey      String?
   secretKey   String?
   environment String   @default("production")
   isActive    Boolean  @default(true)
+  
+  // Messaging specific fields
+  smtpHost    String?
+  smtpPort    Int?
+  senderEmail String?
+  senderName  String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -361,7 +368,7 @@ model ContentCalendar {
   title       String
   channel     String         // "Email" | "SMS" | "Blog" | "Announcement"
   scheduledAt DateTime
-  status      String         @default("Draft") // "Draft" | "Approved" | "Scheduled" | "Published"
+  status      String         @default("Draft") // "Suggested" | "Draft" | "Approved" | "Scheduled" | "Sent" | "Published" | "Failed" | "Dismissed"
   content     String         @db.Text
   subject     String?
   reason      String?        // AI suggestion context

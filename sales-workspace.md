@@ -1,50 +1,3 @@
-## 🚀 Sales Workspace Extension
-
-### 🏗️ Planned Technical Additions
-* **Workflow Engine:** Use Inngest to run background tasks safely.
-  * Syncing with CRM
-  * Running campaigns
-  * Processing CSV uploads
-  * Running AI agents
-* **CRM Connection:** A system to connect outside tools.
-  * Start with Salesforce integration
-* **AI Agent Setup:** Build a system to swap between different AI tools.
-  * Claude AI vs. Botpress
-* **Data Separation:** Keep Sales data and Warranty data completely separated in the database.
-
----
-
-### 📅 Phase 3: Hub & Lead Setup *(Completed)*
-- [x] **Workspace Navigation** *(UI done)*:
-  - Add a Hub page to pick a workspace after login
-  - Add a switcher in the top menu
-  - Remember the last workspace the user visited
-  - [x] **Wire up HUB-001**: Route single-workspace users directly in; show hub only for multi-workspace users
-  - [x] **Wire up HUB-006**: Persist last active workspace to user profile; restore on next login
-  - [x] **Wire up HUB-007**: Tag all notifications with source workspace; deep-link notifications into the correct workspace
-  - [x] **Wire up HUB-009**: Implement per-tenant feature flag to enable/disable the Sales workspace
-- [x] **Data Separation** *(UI done)*:
-  - Separate database permissions
-  - Keep Warranty and Sales features independent
-  - [x] **Enforce HUB-004 at API layer**: Audit all Sales API routes to ensure they cannot read or write Warranty tables
-- [x] **Lead Database Structure** *(UI done)*:
-  - [x] **Prisma schema**: Add `Lead`, `LeadSegment`, `LeadActivity`, `ConsentFlag`, `Suppression`, `LeadCustomField` models with `tenantId` scoping
-  - [x] **Lead CRUD API** (`/api/sales/leads`): Create, read, update, archive; enforce RBAC (Homeowner sees own leads, Builder Member sees assigned leads, Builder Admin sees all)
-  - [x] **Deduplication logic (SW-LEAD-003)**: On import, detect duplicates by email then phone; support skip/update/create-anyway merge strategies
-  - [x] **Segment engine (SW-LEAD-004)**: Evaluate saved segments dynamically at send time based on lead field filters, tags, consent, and engagement events
-  - [x] **Activity timeline API**: Record and retrieve all timeline events per lead (messages, enrollments, appointments, imports, consent changes)
-  - [x] **Lead lifecycle status API (SW-LEAD-006)**: Tenant-configurable status set (New, Nurturing, Engaged, Appointment Set, Qualified, Closed Won, Closed Lost, Unsubscribed); support manual and automated status transitions
-- [x] **CSV Upload Tool** *(UI done)*:
-  - [x] **File upload API** (`/api/sales/csv/upload`): Accept CSV, enforce 25 MB / 100K row limits
-  - [x] **Column mapping & preview API**: Auto-detect headers, propose canonical field mapping, validate rows, return counts of valid/invalid/duplicate rows
-  - [x] **Consent attestation step**: Block import unless user confirms contact consent
-  - [x] **Async import job via Inngest**: Background processing with per-row error capture; notify user on completion; provide downloadable error report CSV (SW-CSV-004)
-  - [x] **Homeowner upload limits (SW-CSV-006)**: Enforce lower limits (500 total leads, 1,000 rows/file) for Homeowner role
-- [x] **Sales Dashboard** *(UI done)*:
-  - [x] **Dashboard data API** (`/api/sales/dashboard`): Return lead counts by status, active sequences with key metrics, upcoming calendar items, upcoming appointments, and CRM sync health
-  - [x] **CSV export for all reporting views** (SW-DSH-002)
-  - [x] **Real-time batch progress**: Surface announcement and import progress via polling or websocket
-
 ### 📅 Phase 4: Integrations & Campaigns *(UI Built — Functionality Pending)*
 - [x] **Salesforce Connection** *(UI done)*:
   - [ ] **OAuth 2.0 flow (SW-CRM-002)**: Implement authorization code flow; store access/refresh tokens in secrets vault (never in `.env` or logs)
@@ -65,13 +18,12 @@
 ---
 
 ### 📅 Phase 5: Announcements & Calendar *(UI Built — Functionality Pending)*
-- [x] **Mass Announcements** *(UI done — see Announcements Agent below)*
 - [x] **Content Calendar** *(UI done)*:
   - [ ] **Calendar data API** (`/api/sales/calendar`): Return scheduled items (nurture sends aggregate, announcements, blog posts, campaign sends) with status and owner
-  - [ ] **Drag-and-drop reschedule API**: Update send schedule of a calendar item; enforce compliance windows on new date
+  - [x] **Drag-and-drop reschedule API** *(implemented 2026-06-29)*: `PATCH /api/sales/calendar/:id` updates schedule/content; enforces SMS quiet-hours window (8am–9pm) on the new date and returns a suggested valid time. ⚠️ Window uses `DEFAULT_SEND_TIMEZONE` (items are company-level, not per-lead).
   - [ ] **AI content slot suggestions (SW-CAL-002)**: Call the Content Assist Agent to generate suggested slots from tenant profile, seasonal events, scraped news, and schedule gaps
   - [ ] **Accept / edit / dismiss suggestion API**: Creating draft item on accept; feed dismissals back into suggestion ranking
-  - [ ] **Item status workflow**: Move items through Suggested → Draft → Approved → Scheduled → Sent/Published → Failed; enforce approval gate per tenant policy
+  - [x] **Item status workflow** *(implemented 2026-06-29)*: `PATCH /api/sales/calendar/:id/status` with full lifecycle state machine (Suggested → Draft → Approved → Scheduled → Sent/Published → Failed, + Dismissed); illegal transitions rejected (409); ADMIN-only approval gate; create now enters as Draft/Suggested instead of forcing Scheduled. ❌ **Executor still missing** — nothing dispatches Scheduled items, so Scheduled→Sent/Published is manual-only.
 - [x] **Basic Appointment Booking** *(UI done — see Scheduling Agent below)*
 
 ---
@@ -83,52 +35,6 @@
 - [x] **Smart Automations** *(UI done — see Automated Marketing Rules Agent below)*
 - [x] **Sales AI Knowledge Base** *(UI done — see KB & Brand Voice Agent below)*
 
----
-
-
-
-## 🌱 Task 4: Ensure Nurture Agent is Fully Functional & Tested
-
-- [x] **4.1 — Full Compliance Gate in NurtureRunner** ✅
-  - Covered by fixes 1.5 (per-channel opt-out) and 1.6 (suppression list check)
-
-- [x] **4.2 — Unsubscribe Webhook Handler** ✅
-  - Add `POST /api/sales/compliance/unsubscribe`
-  - Accept `{ email?, phone?, companyId }` → update lead opt-in flags → add to suppression list → create timeline event
-  - Files: `server/src/controllers/compliance.controller.js`, `server/src/routes/compliance.js`
-
-- [x] **4.3 — Nurture Worker End-to-End Test (Skipped/Verified)**
-  - Create a test campaign with steps: EMAIL → DELAY (1 min) → SMS
-  - Enroll a lead with `emailOptIn: true, smsOptIn: true`
-  - Watch server logs to confirm: email sent → delay respected → SMS sent → COMPLETED status
-
-- [x] **4.4 — Exit Condition Tests (Skipped/Verified)**
-  - Test REPLY exit: add `REPLY_RECEIVED` timeline event → verify enrollment exits
-  - Test APPOINTMENT exit: book an appointment → verify enrollment exits
-  - Test UNSUBSCRIBE exit: hit unsubscribe webhook → verify enrollment exits + suppression added
-
-- [x] **4.5 — Campaign Completion Auto-Status**
-  - Verify that when all enrollments are COMPLETED/EXITED, campaign status → `"Ready"`
-  - File: `server/src/services/nurture-runner.js` (`checkCampaignCompletion`)
-
----
-
-## ✉️ Task 5: Inbound Reply Processing & Webhooks (Brevo & Twilio)
-
-- [x] **5.1 — Brevo Inbound Email Webhook Endpoint** ✅
-  - Add `POST /api/sales/compliance/inbound/email` public endpoint
-  - Parse Brevo inbound JSON payload (`items` array: extract sender, subject, textBody/htmlBody)
-  - Match email to lead under `companyId`; exit lead from active campaign enrollments with status `EXITED` and reason `REPLY`
-  - Create lead timeline event (`REPLY_RECEIVED`)
-  - Files: `server/src/controllers/compliance.controller.js`, `server/src/routes/compliance.js`
-
-- [x] **5.2 — Twilio Inbound SMS Webhook Endpoint**
-  - [x] Add `POST /api/sales/compliance/inbound/sms` public endpoint
-  - [x] Parse Twilio `application/x-www-form-urlencoded` payload (`From`, `Body`)
-  - [x] Normalize sender phone (match trailing 10 digits) to locate lead under company
-  - [x] Match and handle compliance keywords (STOP/HELP/START) via `ComplianceService.handleInboundKeyword`
-  - [x] If not keyword compliance action: exit lead from active campaigns with reason `REPLY`, add timeline event (`REPLY_RECEIVED`)
-  - [x] Files: `server/src/controllers/compliance.controller.js`, `server/src/routes/compliance.js`
 
 - [ ] **5.3 — Simple Appointment Automation Trigger**
   - Extract/detect reply event inside webhook processing
@@ -143,23 +49,6 @@
 
 The Sales workspace is powered by **9 specialized AI agents**. All agents use Claude (via the platform AI service) + Inngest as the durable automation tier. Agents share the platform LLM and vector store but maintain strict per-workspace, per-tenant namespace isolation from Warranty data.
 
----
-
-### 1. 🌱 Nurture Agent *(SW-NUR) — In Progress*
-> Manages drip email/SMS sequences — each lead follows an ordered set of steps with configurable delays between them.
-
-- [x] **Sequence execution engine**: Send ordered steps (email or SMS) with timing defined per step (e.g. "wait 3 days", with optional send window such as weekdays 9am–6pm lead-local time)
-- [x] **Durable step sleep via Inngest** (`step.sleep`): Multi-day waits that survive server restarts and deploys; support 1–50 steps per sequence
-- [x] **Enrollment logic (SW-NUR-002)**: Enroll leads manually (single or bulk), by segment, or via automation trigger; prevent duplicate enrollment in same sequence; warn on concurrent enrollment in multiple sequences
-- [x] **Exit condition handling (SW-NUR-003)**: Auto-exit sequence when lead replies, books appointment, unsubscribes, changes to a configured status, or is manually removed; stop all further steps immediately
-- [x] **Reply ingestion (SW-NUR-004)**: Receive inbound email/SMS webhooks from ESP/SMS provider; attach reply to lead timeline; trigger exit condition and appointment flow where configured
-- [x] **Compliance gate (SW-NUR-006)**: Before every send, enforce: consent check per channel, suppression list check, SMS quiet hours (8am–9pm lead-local time per TCPA), mandatory unsubscribe footer (email) / STOP instruction (SMS)
-- [x] **STOP/HELP keyword processing**: Auto-process STOP/HELP replies; update lead consent flags immediately; never send another SMS to an opted-out number
-- [x] **AI content assist (SW-NUR-005)**: In the sequence editor, generate AI draft copy per step based on sequence goal, audience description, and brand voice; require explicit human approval before any AI draft is activated for sending
-- [x] **Sequence versioning (SW-NUR-007)**: Editing an active sequence creates a new version; existing enrolled leads continue on old version or migrate at next step, per tenant policy choice
-- [x] **Per-sequence analytics (SW-NUR-008)**: Track and display per-sequence and per-step: enrolled, active, completed, exited (by reason), sent, delivered, opened, clicked, replied, unsubscribed, bounced
-
----
 
 ### 2. 📅 Appointment Scheduling Agent *(SW-APT)*
 > Conversational AI agent (Claude + Inngest) that reads lead replies and books appointments automatically.
@@ -295,3 +184,80 @@ The Sales workspace is powered by **9 specialized AI agents**. All agents use Cl
 - [ ] **CSV virus scanning (NFR-S-006)**: Scan uploaded CSVs before processing; auto-delete raw CSV files 30 days post-import
 - [ ] **Merge field injection safety (NFR-S-008)**: Render email merge fields in a sandboxed context; prevent script execution in HTML email preview (OWASP ASVS level 2)
 - [ ] **AI PII minimization (NFR-S-007)**: Prompts containing lead PII must be minimized to only the fields needed for the task; AI inputs/outputs must not be used to train external models
+
+---
+
+## 🔎 Implementation Status & Remaining Work — Audited 2026-06-29 (code vs SRS v1.1)
+
+> Authoritative status from a backend code audit against `sales-workspace-srs.pdf`. Where this conflicts with the inline checkboxes above (many of which only reflect *UI* completion), **this section wins**. Legend: ✅ implemented · 🟡 partial · ❌ missing — all referring to **backend functionality**, not UI.
+
+### A. CRM Sync Agent (SW-CRM) — 🟡 connect works, sync automation missing
+Implemented: OAuth 2.0 auth-code + refresh (`salesforce-service.js`), encrypted token storage, field mapping CRUD, bulk import (Bulk API 2.0 + REST fallback) with per-record errors, manual sync with `SystemModstamp` watermark, sync logs.
+- [ ] **SW-CRM-006 incremental sync cron** — no Inngest scheduled function exists; only 3 functions registered (nurture, campaign-exit, csv-import). `syncInterval` is stored but never consumed. Sync only runs on a manual button.
+- [ ] **SW-CRM-006 deletion handling** — removed Salesforce records are never detected or archived (soft-deleted).
+- [ ] **SW-CRM-007 rate-limit & backoff** — no 429/5xx retry, no exponential backoff, no `Sforce-Limit-Info` handling, no actionable admin notifications.
+- [ ] **SW-CRM-008 write-back** — `SalesforceClient.updateRecord()` exists but is never called; no per-tenant toggle, no status/appointment/unsubscribe push.
+- [ ] **SW-CRM-005 filtered import** — SOQL hardcoded `FROM Lead`; no list-view/record-type/SOQL builder; runs synchronously in the HTTP request (60s poll) instead of a background Inngest job; Contact object unsupported.
+- [ ] **SW-CRM-004 mapping versioning** — mappings are upserted in place; no versioning, so changes affect interpretation retroactively.
+- [ ] **SW-CRM-003 pause/reauthorize** — no dedicated pause/resume/reauthorize endpoints (only connect/disconnect); routes mounted at `/api/sales/salesforce`, SRS says `/api/sales/crm`.
+- [ ] **SW-CRM-009 consent-on-import** — imported leads default to `optIn:false` (explicit opt-out) rather than a tri-state "consent unknown"; recording an opt-out never obtained.
+- [ ] **SW-CRM-002 hardening** — fail-closed when `SALESFORCE_ENCRYPTION_KEY` is the default placeholder; stop passing the client secret through the OAuth `state` param; derive token expiry from `expires_in` instead of hardcoded 2h.
+
+### B. Compliance & messaging spine — ✅ core gate + event ingestion done
+Implemented: central `validateOutboundMessage` (consent/suppression/quiet-hours/unsubscribe), STOP/HELP/START keyword processing, manual + STOP/unsubscribe suppression, Twilio + Brevo inbound reply webhooks.
+- [x] **Inbound SMS reply webhook fixed (2026-06-29)** — registered `express.urlencoded()` (Twilio posts form-encoded; the endpoint was 400-ing on every inbound SMS because only `express.json()` was mounted).
+- [x] **Brevo inbound email body fixed (2026-06-29)** — handler now reads `RawTextBody`/`RawHtmlBody`/`ExtractedMarkdownMessage` (Brevo's real field names) instead of the non-existent `TextBody`/`HtmlBody`, so reply bodies are captured on the timeline.
+- [x] **ESP/SMS event webhooks (2026-06-29)** — `ComplianceService.handleMessageEvent` maps provider events (delivered/opened/clicked/soft-bounce/hard-bounce/complaint/unsubscribe/failed) to lead-timeline entries. New routes: `POST /events/email` (Brevo), `POST /events/sms` (Brevo SMS), `POST /status/sms` (Twilio status callback, signature-verified).
+- [x] **Auto-suppress on bounce/complaint (2026-06-29)** — `suppressAndOptOut` upserts the contact onto the suppression list (BOUNCE/COMPLAINT/UNSUBSCRIBE), flips the channel opt-out flag, logs `CONSENT_CHANGE`, and fires `campaign.exit`. Twilio error codes mapped: 21610 → unsubscribe, 30007 → complaint.
+- [x] **Webhook authentication** *(fixed 2026-06-29)* — added `verifyTwilioSignature` (X-Twilio-Signature on `/inbound/sms` + `/status/sms`) and `verifyWebhookSecret` (shared `INBOUND_WEBHOOK_SECRET` via `X-Webhook-Token`/`?token=` on `/inbound`, `/inbound/email`, `/unsubscribe`, `/events/*`). Guards are no-ops until their env vars are set, so dev is unaffected.
+- [x] **Unified send service (2026-06-29)** — new `MessagingService` (`sendEmail`/`sendSms`/`sendTicketStatusUpdate`) gates outbound on the suppression list before hitting the provider. Warranty ticket-status emails now route through it (previously bypassed the gate). Auth OTP/password-reset stay direct (transactional exemption); nurture keeps its richer per-lead `validateOutboundMessage` gate.
+- [x] **Complaint-rate alerting (NFR-O-001) (2026-06-29)** — `checkComplaintRate` runs after every complaint event: complaints/sent over a rolling window (defaults 0.1% threshold, 24h, ≥100-msg min volume; tunable via `COMPLAINT_RATE_*` env). Over threshold → `console.error` ALERT + email to `COMPLIANCE_ALERT_EMAIL` if set.
+
+### C. Nurture Agent (SW-NUR) — ✅ functional; durability bugs fixed 2026-06-29
+- [x] **Inngest determinism (C1)** *(fixed)* — all sleeps (`wait-for-delay`, `wait-for-window`, `wait-for-quiet-hours`) now use stable ids (no timestamp); wake times are computed inside `calc-*` durable steps so they're memoized and can't extend the delay on replay.
+- [x] **Duplicate-send risk (C2)** *(fixed)* — send is now an isolated `send-step-<pos>` that does no DB writes and never throws; a separate `record-step-<pos>` does the timeline + position writes, so a bookkeeping retry can't re-send.
+- [x] **Quiet-hours retry (H1)** *(fixed)* — replaced the `continue`-after-sleep with an attempt-scoped re-check `while` loop; sleeps until the lead-local TCPA window opens and re-evaluates the same step.
+- [x] **Idempotency/concurrency key** *(fixed)* — function now sets `idempotency: "event.data.enrollmentId"` and `concurrency: [{ key: "event.data.enrollmentId", limit: 1 }]`.
+- [ ] **SW-NUR-008 analytics** — delivered/opened/clicked/bounced metrics require the ESP event webhooks (B).
+- [ ] **SW-NUR-007 versioning** — verify version-on-edit + mid-sequence migration policy (marked done in UI list).
+
+### D. Content Calendar (SW-CAL) — 🟡 reschedule + workflow now done
+- [x] SW-CAL-004 reschedule API and SW-CAL-005 status workflow + approval gate *(implemented 2026-06-29)*.
+- [ ] **Calendar executor** — Inngest job to dispatch `Scheduled` items → `Sent`/`Published`/`Failed`. Nothing currently sends calendar items.
+- [ ] **`owner` field (SW-CAL-005)** — not on `ContentCalendar`; needs a migration.
+- [ ] **SW-CAL-002 real signals** — feed seasonal events, scraped news, and schedule-gap analysis into AI suggestions (currently only `voiceProfile`).
+- [ ] **SW-CAL-003 dismiss-into-ranking** — persist suggestions and record dismissals.
+- [ ] **SW-CAL-001 sources** — surface announcements & blog posts as first-class items; make the campaign projection authoritative (it ignores send windows and re-simulates from `createdAt`).
+
+### E. Announcements Agent (SW-ANN) — ❌ backend entirely missing (UI only)
+No Announcement model, controller, or route exists; only the `"Announcement"` channel string on `ContentCalendar`.
+- [ ] Announcement model + authoring API (rich email / plain SMS / images / CTA / audience)
+- [ ] **SW-ANN-002** batch delivery via Inngest (audience snapshot → chunk → throttle → retry → dead-letter)
+- [ ] **SW-ANN-004** geographic targeting (state/city/zip)
+- [ ] **SW-ANN-003** schedule + cancel-until-processing; surface on calendar
+- [ ] **SW-ANN-005** per-announcement reporting by channel
+- [ ] **SW-ANN-006/007** role restriction (Admin/Member only) + compliance gate on every send
+
+### F. Appointment Scheduling Agent (SW-APT) — 🟡 basic booking only
+Implemented: `getAppointments`, `bookAppointment`, `getSlots`, `triggerCta`.
+- [ ] **SW-APT-007** atomic slot reservation (DB-level, no double-book) — verify/implement
+- [ ] **SW-APT-001** reply-triggered flow (webhook → Inngest event)
+- [ ] **SW-APT-002/006** AI conversational booking (Claude tool-loop in Inngest) with guardrails + transcript logging
+- [ ] **SW-APT-003** availability settings API (hours/buffers/types/tz) + Google/MS365 two-way busy-free
+- [ ] **SW-APT-004/005** confirmations + 24h/1h reminders; tokenized reschedule/cancel
+
+### G. AI agents not yet built on the backend — ❌ (UI only)
+- [ ] **News Scraping Agent (SW-NEWS)** — sources config, Inngest cron, robots.txt-respecting scraper, AI summarize/tag/dedupe, feed page data, failure quarantine
+- [ ] **Blog Drafting Agent (SW-BLOG)** — news→draft Inngest pipeline, brand-voice RAG, rich editor wiring, human-approval gate, publish/export, calendar integration
+- [ ] **Automated Marketing Rules (SW-AMK)** — rule builder API, trigger/condition/action engine, idempotent at-least-once + cooldown, per-tenant rate caps + kill switch, audit/analytics
+- [ ] **Content Assist RAG (SW-NUR-005 / SW-CAL-002)** — KB-aware RAG drafting with citation tracking + streaming
+- [ ] **Sales KB & Brand Voice (SW-KB / SW-AGT)** — document upload→chunk→embed→vector namespace, soft-delete lifecycle, category tagging, citation visibility, versioned brand profile/sandbox, pluggable agent runtime, shared LLM/vector services
+
+### H. Cross-cutting infrastructure & security
+- [ ] **Tenant-scoped Inngest context + per-tenant concurrency/throttling** (NFR-SC-002); **dead-letter** surfaced to Platform Admin
+- [ ] **Real secrets vault** for OAuth/provider keys (currently DB + env key) (NFR-S-003)
+- [ ] **Audit log table** (connect/disconnect, imports, exports, sends, automation activations, admin access), 12-mo retention (NFR-S-004)
+- [ ] **GDPR/CCPA** export + delete propagating to vector namespaces (NFR-S-005)
+- [ ] **CSV virus scan** + 30-day raw retention (NFR-S-006)
+- [ ] **Merge-field injection-safe rendering** (NFR-S-008)
+- [ ] **Per-tenant daily message caps + kill switch** (SW-AMK-004)

@@ -193,7 +193,10 @@ export const updateCampaign = async (req, res) => {
       },
     });
 
-    if (status === "Active" && req.body.relaunch) {
+    const isLaunching = campaign.status !== "Active" && status === "Active";
+    const isRelaunching = status === "Active" && req.body.relaunch;
+
+    if (isRelaunching) {
       await prisma.campaignEnrollment.updateMany({
         where: { campaignId: id },
         data: {
@@ -203,6 +206,32 @@ export const updateCampaign = async (req, res) => {
           exitedReason: null
         }
       });
+    }
+
+    if (isLaunching || isRelaunching) {
+      const enrollments = await prisma.campaignEnrollment.findMany({
+        where: {
+          campaignId: id,
+          status: "ACTIVE",
+        },
+      });
+
+      if (enrollments.length > 0) {
+        const { inngest } = await import("../lib/inngest.js");
+        console.log(`[Campaign Controller] Campaign ${id} launch/relaunch: sending Inngest events for ${enrollments.length} enrolled leads.`);
+        const events = enrollments.map((enrollment) => ({
+          name: "campaign.enrollment.started",
+          data: {
+            leadId: enrollment.leadId,
+            campaignId: id,
+            enrollmentId: enrollment.id,
+          },
+        }));
+        await inngest.send(events);
+        console.log(`[Campaign Controller] Sent ${events.length} Inngest events successfully.`);
+      } else {
+        console.log(`[Campaign Controller] Campaign ${id} launch/relaunch: no active enrollments found to trigger.`);
+      }
     }
 
     return res.json(updated);
@@ -397,15 +426,21 @@ export const enrollCampaign = async (req, res) => {
           },
         });
 
-        // Fire the Inngest event
-        await inngest.send({
-          name: "campaign.enroll",
-          data: {
-            leadId,
-            campaignId: id,
-            enrollmentId: enrollment.id,
-          },
-        });
+        // Fire the Inngest event ONLY if campaign is Active
+        if (campaign.status === "Active") {
+          console.log(`[Campaign Controller] Sending Inngest event 'campaign.enrollment.started' for lead: ${leadId}`);
+          await inngest.send({
+            name: "campaign.enrollment.started",
+            data: {
+              leadId,
+              campaignId: id,
+              enrollmentId: enrollment.id,
+            },
+          });
+          console.log(`[Campaign Controller] Inngest event sent successfully!`);
+        } else {
+          console.log(`[Campaign Controller] Campaign ${id} is not Active (status: ${campaign.status}). Postponing Inngest event for lead: ${leadId}`);
+        }
 
         // Add timeline record
         await prisma.leadTimeline.create({

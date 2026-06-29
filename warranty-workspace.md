@@ -154,3 +154,32 @@ To validate the complete SRS workflow, the following integration tests should be
 
 ---
 
+## 🔎 SRS Re-Audit & Remaining Work — Audited 2026-06-29 (code vs Warranty SRS v1.0)
+
+> Re-audit of the backend against `Warranty_Care_Agent_SRS.pdf`. Corrects stale claims in §1–§3 above. Legend: ✅ implemented · 🟡 partial · ❌ missing — referring to **backend functionality**.
+
+### Correction to §3.1 / FR-06 — ERP syncing is further along than previously stated
+The earlier audit said syncing was Builtopia-only and missing. In fact `server/src/services/erp-service.js` implements **all three connectors** — `BuiltopiaClient`, `BuildertrendClient`, `HyphenClient` — each with `syncTicket`/`testConnection`, dispatched via `syncTicketToERP(ticketId)`.
+- ✅ FR-06/FR-11 connectors for Builtopia, Buildertrend, Hyphen exist (REST clients, sandbox/prod base URLs).
+- ✅ Auto-sync fires when a ticket is **RESOLVED** and on the Botpress orchestration webhook (`integrations.controller.js:370`), plus a manual `syncIntegration` endpoint.
+- 🟡 **Gap:** ticket **creation/escalation does not push to the ERP** — sync is deferred to resolution. SRS §4.2.7 expects the structured handoff written to the ERP at escalation.
+  - [ ] Trigger `syncTicketToERP` on ticket creation/escalation (not only on RESOLVED).
+- 🟡 **Gap (NFR 6.5):** failed ERP writes are only logged (try/catch), not queued.
+  - [ ] Queue + retry failed ERP writes up to 3× with backoff, then raise a portal alert; expose ERP sync failure log (KPI §8.2).
+- [ ] Confirm ERP credentials are read from the DB integration record everywhere (one code path's message still references `.env`).
+
+### Phase 2 — Multi-Agent System (SRS §5) — 🔴 not built as specified (by design)
+The MD treats Phase 2 as fully offloaded to Botpress. The SRS §5 specifies a custom Orchestrator + 7 sub-agents (Intake, Identify, Diagnostic, Research, Resolution, ERP, Reviewer) on a LangGraph/custom MAS framework with per-agent token accounting and fallback-to-Phase-1.
+- [ ] **Decision needed:** ratify "Botpress satisfies Phase 2" vs. build the SRS's orchestrated MAS. If keeping Botpress, record it as an explicit deviation from §5 so acceptance criteria 9–14 are re-scoped.
+- [ ] §5.8 portal features if MAS is pursued: per-claim agent-step display, per-agent token/cost breakdown, MAS-vs-workflow trigger config, Reviewer Agent toggle (these are Botpress-side today).
+
+### Remaining functional & NFR gaps
+- [ ] **FR-16 verify:** confirm Brevo status-change emails now flow through per-company DB messaging config (post env-removal work) and not stale env SMTP.
+- [ ] **Testing plan (still open in §Testing):** multi-property ticket linkage, full Builtopia round-trip via webhook, Brevo delivery on status change.
+- [ ] **NFR 6.3 retention:** configurable transcript retention (default 7 yrs) — confirm enforced, not just stored.
+- [ ] **NFR 6.3 RBAC:** verify warranty staff are scoped to assigned properties (not all-tenant) at the query layer.
+- [ ] **FR-13/SRS 4.3.4 citations:** "documents referenced in a ticket" — confirm wired to real KB retrieval data (Botpress-dependent).
+- [ ] **Audit/observability:** ERP sync success-rate + failure log surfaced in KPI dashboard (§8.2).
+
+---
+

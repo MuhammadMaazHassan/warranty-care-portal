@@ -13,6 +13,7 @@ import appointmentsRouter from "./routes/appointments.js";
 import segmentsRouter from "./routes/segments.js";
 import csvRouter from "./routes/csv.js";
 import salesDashboardRouter from "./routes/sales-dashboard.js";
+import messagingSettingsRouter from "./routes/messaging-settings.js";
 
 // Core Warranty Routes
 import dashboardRouter from "./routes/dashboard.js";
@@ -27,7 +28,6 @@ import communitiesRouter from "./routes/communities.js";
 import homeownersRouter from "./routes/homeowners.js";
 import usersRouter from "./routes/users.js";
 
-import { initSms } from "./services/sms.service.js";
 import { serve } from "inngest/express";
 import { inngest } from "./lib/inngest.js";
 import { runNurtureCampaign, handleCampaignExit } from "./inngest/functions/nurture.js";
@@ -45,6 +45,9 @@ app.use(
 );
 
 app.use(express.json({ limit: "10mb" }));
+// Twilio (and other SMS providers) post inbound webhooks as
+// application/x-www-form-urlencoded, so this parser is required for /inbound/sms.
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Route registrations
 app.use("/api/auth", authRouter);
@@ -58,6 +61,7 @@ app.use("/api/sales/appointments", appointmentsRouter);
 app.use("/api/sales/segments", segmentsRouter);
 app.use("/api/sales/csv", csvRouter);
 app.use("/api/sales/dashboard", salesDashboardRouter);
+app.use("/api/sales/settings/messaging", messagingSettingsRouter);
 
 // Core Warranty Route Mounts
 app.use("/api/dashboard", dashboardRouter);
@@ -71,9 +75,10 @@ app.use("/api/admin", adminRouter);
 app.use("/api/communities", communitiesRouter);
 app.use("/api/homeowners", homeownersRouter);
 app.use("/api/users", usersRouter);
-
 // Inngest Endpoint
-app.use("/api/inngest", serve({ client: inngest, functions: [runNurtureCampaign, handleCampaignExit, handleCsvImport] }));
+app.use("/api/inngest", (req, res, next) => {
+  next();
+}, serve({ client: inngest, functions: [runNurtureCampaign, handleCampaignExit, handleCsvImport] }));
 
 // Health Check
 app.get("/api/health", (req, res) => {
@@ -86,8 +91,6 @@ if (process.env.VERCEL || process.env.NODE_ENV === "test") {
 } else {
   app.listen(port, () => {
     console.log(`[Server] Standalone backend running on port ${port}`);
-    // Initialize SMS service
-    initSms();
   });
 }
 

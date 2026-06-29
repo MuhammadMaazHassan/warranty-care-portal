@@ -461,6 +461,133 @@ export const unsubscribeWebhook = async (req, res) => {
   }
 };
 
+/**
+ * Brevo transactional email event webhook. Brevo POSTs delivery/engagement/failure events
+ * either as a single object or batched under `items`/an array. Each event carries `event`,
+ * `email`, and (for bounces) `reason`. companyId is supplied via the webhook URL `?companyId=`.
+ */
+export const processBrevoEmailEvents = async (req, res) => {
+  try {
+    const companyId = req.query.companyId || req.body?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ message: "companyId is required." });
+    }
+
+    const raw = req.body;
+    const events = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.events)
+      ? raw.events
+      : [raw];
+
+    let handled = 0;
+    for (const ev of events) {
+      const email = ev.email || ev.recipient || ev["email_address"];
+      const eventType = ev.event || ev.type || "";
+      if (!email || !eventType) continue;
+
+      const result = await ComplianceService.handleMessageEvent({
+        companyId,
+        channel: "EMAIL",
+        provider: "BREVO",
+        contact: email,
+        rawEventType: eventType,
+        metadata: {
+          subject: ev.subject,
+          messageId: ev["message-id"] || ev.messageId,
+          reason: ev.reason,
+          link: ev.link,
+          tag: ev.tag,
+          ts: ev.ts || ev.date,
+        },
+      });
+      if (result.handled) handled++;
+    }
+
+    return res.json({ success: true, handled, total: events.length });
+  } catch (error) {
+    console.error("[Brevo Email Events] Error:", error);
+    return res.status(500).json({ message: error.message || "Internal server error" });
+  }
+};
+
+/**
+ * Brevo transactional SMS event webhook (delivered / hard_bounce / blocked / unsubscribed …).
+ */
+export const processBrevoSmsEvents = async (req, res) => {
+  try {
+    const companyId = req.query.companyId || req.body?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ message: "companyId is required." });
+    }
+
+    const raw = req.body;
+    const events = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : [raw];
+
+    let handled = 0;
+    for (const ev of events) {
+      const phone = ev.to || ev.recipient || ev.msisdn || ev.mobile;
+      const eventType = ev.event || ev.type || ev.status || "";
+      if (!phone || !eventType) continue;
+
+      const result = await ComplianceService.handleMessageEvent({
+        companyId,
+        channel: "SMS",
+        provider: "BREVO_SMS",
+        contact: phone,
+        rawEventType: eventType,
+        errorCode: ev.errorCode || ev.error_code || null,
+        metadata: { messageId: ev.messageId || ev["message-id"], reason: ev.reason, ts: ev.ts || ev.date },
+      });
+      if (result.handled) handled++;
+    }
+
+    return res.json({ success: true, handled, total: events.length });
+  } catch (error) {
+    console.error("[Brevo SMS Events] Error:", error);
+    return res.status(500).json({ message: error.message || "Internal server error" });
+  }
+};
+
+/**
+ * Twilio message status callback (form-encoded): MessageStatus = queued|sent|delivered|
+ * undelivered|failed, plus ErrorCode for failures (21610 = STOP/opt-out, 30007 = carrier spam).
+ * companyId via `?companyId=`. Responds with empty TwiML so Twilio doesn't retry.
+ */
+export const processTwilioStatusCallback = async (req, res) => {
+  try {
+    const companyId = req.query.companyId;
+    const { MessageStatus, To, MessageSid, ErrorCode } = req.body || {};
+
+    if (companyId && To && MessageStatus) {
+      await ComplianceService.handleMessageEvent({
+        companyId,
+        channel: "SMS",
+        provider: "TWILIO",
+        contact: To,
+        rawEventType: MessageStatus,
+        errorCode: ErrorCode || null,
+        metadata: { messageSid: MessageSid },
+      });
+    } else {
+      console.warn("[Twilio Status] Missing companyId, To, or MessageStatus");
+    }
+
+    res.set("Content-Type", "text/xml");
+    return res.send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+  } catch (error) {
+    console.error("[Twilio Status] Error:", error);
+    res.set("Content-Type", "text/xml");
+    return res.status(500).send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+  }
+};
+
 export const processBrevoInboundEmail = async (req, res) => {
   try {
     const companyId = req.query.companyId || req.body.companyId;
@@ -479,8 +606,11 @@ export const processBrevoInboundEmail = async (req, res) => {
     for (const item of items) {
       const fromEmail = item.From?.Address;
       const subject = item.Subject || "";
-      const textBody = item.TextBody || "";
-      const htmlBody = item.HtmlBody || "";
+      // Brevo's inbound-parse payload uses RawTextBody / RawHtmlBody (and
+      // ExtractedMarkdownMessage). Fall back across the known field names so the reply body
+      // is captured regardless of which Brevo provides.
+      const textBody = item.RawTextBody || item.TextBody || item.ExtractedMarkdownMessage || "";
+      const htmlBody = item.RawHtmlBody || item.HtmlBody || "";
 
       if (!fromEmail) {
         console.warn("[Brevo Webhook] Item is missing From.Address, skipping.");

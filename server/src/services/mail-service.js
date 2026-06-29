@@ -8,43 +8,95 @@ export class MailService {
   static SENDER_EMAIL = process.env.SENDER_EMAIL || "noreply@bitzsol.com";
   static SENDER_NAME = "Aiforhomebuilder";
 
-  static transporter = nodemailer.createTransport({
-    host: this.SMTP_HOST,
-    port: this.SMTP_PORT,
-    secure: this.SMTP_PORT === 465,
-    auth: {
-      user: this.SMTP_USER,
-      pass: this.SMTP_PASS,
-    },
-  });
+  static transporter = (() => {
+    console.log(`[Mail Service] Initializing default SMTP transporter: host=${MailService.SMTP_HOST}, port=${MailService.SMTP_PORT}`);
+    return nodemailer.createTransport({
+      host: MailService.SMTP_HOST,
+      port: MailService.SMTP_PORT,
+      secure: MailService.SMTP_PORT === 465,
+      auth: {
+        user: MailService.SMTP_USER,
+        pass: MailService.SMTP_PASS,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+      logger: false,
+      debug: false,
+    });
+  })();
 
-  static async sendEmail({ to, subject, html, fromName, fromEmail }) {
-    if (!this.SMTP_USER || !this.SMTP_PASS) {
-      console.warn("[Mail Service] SMTP credentials (SMTP_USER/SMTP_PASS) are not set. Email will not be sent.");
+  static transporters = new Map();
+
+  static getOrCreateTransporter(smtpConfig) {
+    if (!smtpConfig) return this.transporter;
+    
+    const cacheKey = `${smtpConfig.host}:${smtpConfig.port}:${smtpConfig.user}`;
+    if (!this.transporters.has(cacheKey)) {
+      const newTransporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.port === 465,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+        logger: false,
+        debug: false,
+      });
+      this.transporters.set(cacheKey, newTransporter);
+    }
+    return this.transporters.get(cacheKey);
+  }
+
+  static async sendEmail({ to, subject, html, fromName, fromEmail, smtpConfig }) {
+    if (!smtpConfig && (!this.SMTP_USER || !this.SMTP_PASS)) {
+      console.warn("[Mail Service] SMTP credentials missing and no custom config provided. Email will not be sent.");
       return { success: false, error: "SMTP credentials missing" };
     }
 
-    const senderName = fromName || this.SENDER_NAME;
-    const senderEmail = fromEmail || this.SENDER_EMAIL;
+    const senderName = smtpConfig?.senderName || fromName || this.SENDER_NAME;
+    const senderEmail = smtpConfig?.senderEmail || fromEmail || this.SENDER_EMAIL;
     const fromString = `"${senderName}" <${senderEmail}>`;
+    
+    const activeTransporter = this.getOrCreateTransporter(smtpConfig);
+    const host = smtpConfig?.host || this.SMTP_HOST;
+    const port = smtpConfig?.port || this.SMTP_PORT;
 
     try {
-      const info = await this.transporter.sendMail({
+      console.log(`[Mail Service] Attempting to send email...`);
+      console.log(`[Mail Service]   From: ${fromString}`);
+      console.log(`[Mail Service]   To: ${to}`);
+      console.log(`[Mail Service]   Subject: ${subject}`);
+      console.log(`[Mail Service]   SMTP: ${host}:${port}`);
+
+      const info = await activeTransporter.sendMail({
         from: fromString,
         to,
         subject,
         html,
       });
 
-      console.log(`[Mail Service] Email sent successfully to ${to}. Message ID: ${info.messageId}`);
-      return { success: true, messageId: info.messageId };
+      console.log(`[Mail Service] ✅ Email sent successfully!`);
+      console.log(`[Mail Service]   Message ID: ${info.messageId}`);
+      console.log(`[Mail Service]   Response: ${info.response}`);
+      console.log(`[Mail Service]   Accepted: ${JSON.stringify(info.accepted)}`);
+      console.log(`[Mail Service]   Rejected: ${JSON.stringify(info.rejected)}`);
+      return { success: true, messageId: info.messageId, response: info.response };
     } catch (error) {
-      console.error("[Mail Service] Failed to send email:", error);
+      console.error(`[Mail Service] ❌ Failed to send email to ${to}`);
+      console.error(`[Mail Service]   Error Code: ${error.code || 'N/A'}`);
+      console.error(`[Mail Service]   Error Message: ${error.message}`);
+      console.error(`[Mail Service]   SMTP Response: ${error.response || 'N/A'}`);
+      console.error(`[Mail Service]   Full Error:`, error);
       return { success: false, error: error?.message || "Internal error" };
     }
   }
 
-  static async sendTicketStatusUpdate(to, homeownerName, ticketId, status, company = null) {
+  static async sendTicketStatusUpdate(to, homeownerName, ticketId, status, company = null, smtpConfig = null) {
     const statusLabel = status.replace("_", " ").toLowerCase();
     const subject = `Ticket Update: ${ticketId} is now ${statusLabel}`;
 
@@ -77,7 +129,7 @@ export class MailService {
       </div>
     `;
 
-    return this.sendEmail({ to, subject, html, fromName: companyName, fromEmail: companyEmail });
+    return this.sendEmail({ to, subject, html, fromName: companyName, fromEmail: companyEmail, smtpConfig });
   }
 
   static async sendVerificationOtp(to, otp) {

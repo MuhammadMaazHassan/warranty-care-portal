@@ -21,126 +21,188 @@ const calculateDelayTime = (value, unit) => {
 
 export const runNurtureCampaign = inngest.createFunction(
   {
-    id: "run-nurture-campaign",
-    event: "campaign.enroll",
-    // Cancel this run immediately if a campaign.exit event is fired for this lead
-    cancelOn: [
-      {
-        event: "campaign.exit",
-        match: "data.leadId",
-      },
-    ],
+    id: "run-nurture-campaign-v4",
+    // Delivery is at-least-once, so the trigger can arrive more than once for the same
+    // enrollment. Dedupe duplicate triggers and never run two copies of one enrollment
+    // in parallel (which would double-send).
+    idempotency: "event.data.enrollmentId",
+    concurrency: [{ key: "event.data.enrollmentId", limit: 1 }],
+    triggers: [{ event: "campaign.enrollment.started" }],
   },
   async ({ event, step }) => {
     const { leadId, campaignId, enrollmentId } = event.data;
+    console.log(`[Nurture] === START === event received for lead=${leadId}, campaign=${campaignId}, enrollment=${enrollmentId}`);
 
-    // We do all major db work inside `step.run` so it's durable and retriable
-    const { lead, campaign, enrollment } = await step.run("fetch-campaign-data", async () => {
-      const e = await prisma.campaignEnrollment.findUnique({
-        where: { id: enrollmentId },
-        include: {
-          lead: { include: { company: true } },
-          campaign: { include: { steps: { orderBy: { position: "asc" } } } },
+    const e = await prisma.campaignEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        lead: { 
+          include: { 
+            company: {
+              include: {
+                integrations: {
+                  where: { platform: { in: ["BREVO_EMAIL", "BREVO_SMS", "TWILIO"] } }
+                }
+              }
+            }
+          } 
         },
-      });
-      return { lead: e?.lead, campaign: e?.campaign, enrollment: e };
+        campaign: { include: { steps: { orderBy: { position: "asc" } } } },
+      },
     });
+    console.log(`[Nurture] fetch-campaign-data: enrollment found=${!!e}, campaign=${e?.campaign?.name}, stepsCount=${e?.campaign?.steps?.length}, lead=${e?.lead?.firstName} ${e?.lead?.lastName} (${e?.lead?.email})`);
+    if (e?.campaign?.steps) {
+      e.campaign.steps.forEach(s => console.log(`[Nurture]   step position=${s.position}, type=${s.type}, subject=${s.subject}`));
+    }
+    const lead = e?.lead;
+    const campaign = e?.campaign;
+    const enrollment = e;
 
     if (!enrollment || enrollment.status !== "ACTIVE") {
+      console.log(`[Nurture] SKIPPED: enrollment status=${enrollment?.status || 'NOT FOUND'}`);
       return { status: "skipped", reason: "Enrollment not active or not found" };
     }
 
     const steps = campaign.steps;
+    console.log(`[Nurture] Processing ${steps.length} steps. currentStepPosition=${enrollment.currentStepPosition}`);
     let currentPosition = enrollment.currentStepPosition || 1;
+
+    // Extract messaging configurations
+    let smtpConfig = null;
+    let smsConfig = null;
+    
+    if (lead?.company?.integrations) {
+      const emailInt = lead.company.integrations.find(i => i.platform === "BREVO_EMAIL" && i.isActive);
+      if (emailInt) {
+        smtpConfig = {
+          host: emailInt.smtpHost,
+          port: emailInt.smtpPort,
+          user: emailInt.apiKey,
+          pass: emailInt.secretKey,
+          senderEmail: emailInt.senderEmail,
+          senderName: emailInt.senderName,
+        };
+      }
+      
+      const smsInt = lead.company.integrations.find(i => (i.platform === "BREVO_SMS" || i.platform === "TWILIO") && i.isActive);
+      if (smsInt) {
+        smsConfig = {
+          provider: smsInt.platform,
+          apiKey: smsInt.apiKey,
+          apiSecret: smsInt.secretKey,
+          senderName: smsInt.senderName,
+        };
+      }
+    }
 
     for (const currentStep of steps) {
       if (currentStep.position < currentPosition) continue;
+      console.log(`[Nurture] Executing step position=${currentStep.position}, type=${currentStep.type}`);
 
       if (currentStep.type === "DELAY") {
-        // Calculate sleep duration
-        const delayValue = currentStep.delayValue || 0;
-        const delayUnit = currentStep.delayUnit || "DAYS";
+        // Compute the wake time INSIDE a durable step so it is memoized. Computing it in
+        // plain scope recomputes it on every replay; combined with a timestamp-based sleep
+        // id that made the delay re-fire for the full duration on each wake. The sleep id is
+        // now stable (position only), and the recorded wake time is fixed on first run.
+        const nextTime = await step.run(`calc-delay-${currentStep.position}`, async () => {
+          const delayValue = currentStep.delayValue || 0;
+          const delayUnit = currentStep.delayUnit || "DAYS";
 
-        let nextTime = calculateDelayTime(delayValue, delayUnit);
-        
-        // Handle send windows
-        if (currentStep.sendWindowDays && currentStep.sendWindowStart && currentStep.sendWindowEnd) {
-          const tz = getLeadTimezone(lead.state);
-          nextTime = getNextValidSendWindow(nextTime, tz, currentStep.sendWindowDays, currentStep.sendWindowStart, currentStep.sendWindowEnd);
-        }
+          let t = calculateDelayTime(delayValue, delayUnit);
 
-        // Update DB
-        await step.run("update-delay-status", async () => {
+          if (currentStep.sendWindowDays && currentStep.sendWindowStart && currentStep.sendWindowEnd) {
+            const tz = getLeadTimezone(lead.state);
+            t = getNextValidSendWindow(t, tz, currentStep.sendWindowDays, currentStep.sendWindowStart, currentStep.sendWindowEnd);
+          }
+
           await prisma.campaignEnrollment.update({
             where: { id: enrollment.id },
-            data: { currentStepPosition: currentStep.position, nextRunAt: nextTime },
+            data: { currentStepPosition: currentStep.position, nextRunAt: t },
           });
+
+          return new Date(t).toISOString();
         });
 
-        // Use Inngest's durable sleep
-        await step.sleepUntil("wait-for-delay", nextTime);
+        await step.sleepUntil(`wait-for-delay-${currentStep.position}`, nextTime);
 
         currentPosition = currentStep.position + 1;
         continue;
       }
 
-      // Check send window dynamically if it's an EMAIL or SMS step
+      // Send-window check (EMAIL/SMS). Compute the target inside a durable step and sleep
+      // with a STABLE id so replays cannot re-arm the wait.
       if (currentStep.sendWindowDays && currentStep.sendWindowStart && currentStep.sendWindowEnd) {
-        const nextValidTime = await step.run("check-send-window", async () => {
+        const windowTarget = await step.run(`calc-window-${currentStep.position}`, async () => {
           const tz = getLeadTimezone(lead.state);
-          return getNextValidSendWindow(new Date(), tz, currentStep.sendWindowDays, currentStep.sendWindowStart, currentStep.sendWindowEnd);
+          const nextValidTime = getNextValidSendWindow(new Date(), tz, currentStep.sendWindowDays, currentStep.sendWindowStart, currentStep.sendWindowEnd);
+          // Only wait if the window opens more than a minute from now.
+          if (new Date(nextValidTime).getTime() > Date.now() + 60000) {
+            return new Date(nextValidTime).toISOString();
+          }
+          return null;
         });
-
-        if (new Date(nextValidTime).getTime() > new Date().getTime() + 60000) {
-          await step.sleepUntil("wait-for-window", nextValidTime);
+        if (windowTarget) {
+          await step.sleepUntil(`wait-for-window-${currentStep.position}`, windowTarget);
         }
       }
 
-      // Compliance Gate
-      const complianceCheck = await step.run("compliance-check", async () => {
-        return ComplianceService.validateOutboundMessage(lead.id, currentStep.type);
-      });
+      // Compliance gate. Runs fresh (not memoized) so consent/suppression/quiet-hours are
+      // re-evaluated accurately on every replay. Quiet-hours is transient: sleep until the
+      // lead-local send window opens, then re-check the SAME step. Each wait uses an
+      // attempt-scoped stable id so a memoized sleep returns instantly without advancing the
+      // loop (the previous code used `continue` after the sleep, which skipped the step on
+      // replay) and without colliding with a fresh wait.
+      let complianceCheck;
+      let quietHoursAttempts = 0;
+      while (true) {
+        complianceCheck = await ComplianceService.validateOutboundMessage(lead.id, currentStep.type);
+        console.log(`[Nurture] Compliance check result: allowed=${complianceCheck.allowed}, reason=${complianceCheck.reason || 'none'}`);
+
+        if (complianceCheck.allowed || !complianceCheck.reason?.includes("Quiet Hours")) {
+          break; // clear to send, or a terminal block (suppressed / opted-out)
+        }
+
+        quietHoursAttempts += 1;
+        const resumeAt = await step.run(`calc-quiet-hours-${currentStep.position}-${quietHoursAttempts}`, async () => {
+          const tz = ComplianceService.getLeadTimezone(lead.state, lead.phone);
+          // Next valid moment inside the TCPA window (8am–9pm lead-local), any day.
+          const target = getNextValidSendWindow(new Date(Date.now() + 60000), tz, "Mon,Tue,Wed,Thu,Fri,Sat,Sun", "08:00", "21:00");
+          return new Date(target).toISOString();
+        });
+        await step.sleepUntil(`wait-for-quiet-hours-${currentStep.position}-${quietHoursAttempts}`, resumeAt);
+      }
 
       if (!complianceCheck.allowed) {
-        if (complianceCheck.reason.includes("Quiet Hours")) {
-          // Sleep for an hour and retry
-          const nextHour = new Date();
-          nextHour.setHours(nextHour.getHours() + 1);
-          nextHour.setMinutes(0, 0, 0);
-          await step.sleepUntil("wait-for-quiet-hours", nextHour);
-          
-          // Re-evaluate this step
-          currentPosition = currentStep.position;
-          continue; 
-        } else {
-          // Suppressed
-          await step.run("exit-suppressed", async () => {
-            await prisma.campaignEnrollment.update({
-              where: { id: enrollment.id },
-              data: { status: "EXITED", exitedReason: "SUPPRESSED" },
-            });
-            await prisma.leadTimeline.create({
-              data: {
-                leadId: lead.id,
-                type: "SYNC_UPDATE",
-                description: `Campaign auto-exited. Reason: ${complianceCheck.reason}`,
-              },
-            });
-            
-            // Check campaign completion
-            const activeCount = await prisma.campaignEnrollment.count({
-              where: { campaignId, status: { in: ["ACTIVE", "PAUSED"] } }
-            });
-            if (activeCount === 0) {
-              await prisma.campaign.update({ where: { id: campaignId }, data: { status: "Ready" } });
-            }
+        // Terminal block (suppression list / opted out) -> exit the campaign.
+        await step.run(`exit-suppressed-${currentStep.position}`, async () => {
+          await prisma.campaignEnrollment.update({
+            where: { id: enrollment.id },
+            data: { status: "EXITED", exitedReason: "SUPPRESSED" },
           });
-          return { status: "exited", reason: "suppressed" };
-        }
+          await prisma.leadTimeline.create({
+            data: {
+              leadId: lead.id,
+              type: "SYNC_UPDATE",
+              description: `Campaign auto-exited. Reason: ${complianceCheck.reason}`,
+            },
+          });
+
+          // Check campaign completion
+          const activeCount = await prisma.campaignEnrollment.count({
+            where: { campaignId, status: { in: ["ACTIVE", "PAUSED"] } }
+          });
+          if (activeCount === 0) {
+            await prisma.campaign.update({ where: { id: campaignId }, data: { status: "Ready" } });
+          }
+        });
+        return { status: "exited", reason: "suppressed" };
       }
 
-      // Send execution
-      await step.run(`execute-step-${currentStep.position}`, async () => {
+      // Send (isolated, non-idempotent I/O). Returns a serializable result and performs NO
+      // database writes, so if the bookkeeping step below fails and is retried, the message
+      // is NOT sent again — the memoized send result is reused. The send itself never throws
+      // (failures are captured into the result) so this step is not retried on a send error.
+      const sendResult = await step.run(`send-step-${currentStep.position}`, async () => {
         const bookingLink = `${process.env.NEXT_PUBLIC_URL || "http://localhost:3000"}/sales/scheduling?leadId=${lead.id}`;
         const variables = {
           firstName: lead.firstName || "",
@@ -160,9 +222,12 @@ export const runNurtureCampaign = inngest.createFunction(
             .replace(/{bookingLink}/g, variables.bookingLink);
         };
 
+        console.log(`[Nurture] Step type=${currentStep.type}, lead.email=${lead.email}, lead.phone=${lead.phone}`);
+
         if (currentStep.type === "EMAIL" && lead.email) {
           const subject = renderText(currentStep.subject || "Outreach Update");
           const body = renderText(currentStep.body || "");
+          console.log(`[Nurture] Sending EMAIL to ${lead.email}, subject="${subject}"`);
 
           const formattedHtml = `
             <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #eaeaea;">
@@ -188,54 +253,81 @@ export const runNurtureCampaign = inngest.createFunction(
             lead.company?.name || "Warranty Care Portal"
           );
 
-          await MailService.sendEmail({
+          const emailResult = await MailService.sendEmail({
             to: lead.email,
             subject,
             html: finalHtml,
             fromName: lead.company?.name || undefined,
-            fromEmail: lead.company?.email || undefined,
+            smtpConfig,
+            // NOTE: Do NOT pass fromEmail here. The company email (e.g. contact@bitzsolhomes.com)
+            // is not verified in Brevo and will cause rejection. Let MailService use the
+            // verified SENDER_EMAIL from .env instead.
           });
 
-          await prisma.leadTimeline.create({
-            data: {
-              leadId: lead.id,
-              type: "EMAIL_SENT",
-              description: `Sent campaign email: "${subject}"`,
-              metadata: { subject, body, campaignId: campaign.id, stepPosition: currentStep.position },
-            },
-          });
+          return {
+            channel: "EMAIL",
+            attempted: true,
+            success: !!emailResult.success,
+            messageId: emailResult.messageId || null,
+            error: emailResult.success ? null : (emailResult.error || "Unknown error"),
+            subject,
+            body,
+          };
         } else if (currentStep.type === "SMS" && lead.phone) {
           const rawBody = renderText(currentStep.body || "");
           const finalBody = ComplianceService.addSmsOptOutSuffix(rawBody);
 
-          let smsSuccess = false;
-          let errorMessage = "";
           try {
-            await sendSms({ to: lead.phone, body: finalBody });
-            smsSuccess = true;
+            console.log(`[Nurture] Step ${currentStep.position}: Triggering sendSms to ${lead.phone}...`);
+            await sendSms({ to: lead.phone, body: finalBody, smsConfig });
+            console.log(`[Nurture] Step ${currentStep.position}: sendSms completed successfully!`);
+            return { channel: "SMS", attempted: true, success: true, error: null, body: finalBody };
           } catch (smsError) {
-            errorMessage = smsError.message;
+            console.error(`[Nurture] Step ${currentStep.position}: sendSms failed with error:`, smsError);
+            return { channel: "SMS", attempted: true, success: false, error: smsError.message || "Unknown error", body: finalBody };
           }
+        }
 
-          if (smsSuccess) {
-            await prisma.leadTimeline.create({
-              data: {
-                leadId: lead.id,
-                type: "SMS_SENT",
-                description: `Sent campaign SMS: "${finalBody.slice(0, 50)}${finalBody.length > 50 ? "..." : ""}"`,
-                metadata: { body: finalBody, campaignId: campaign.id, stepPosition: currentStep.position },
-              },
-            });
-          } else {
-            await prisma.leadTimeline.create({
-              data: {
-                leadId: lead.id,
-                type: "SMS_FAILED",
-                description: `Failed to send campaign SMS: ${errorMessage}`,
-                metadata: { body: finalBody, error: errorMessage, campaignId: campaign.id, stepPosition: currentStep.position },
-              },
-            });
-          }
+        // Step type with no matching contact channel on the lead -> nothing sent.
+        return { channel: currentStep.type, attempted: false };
+      });
+
+      // Bookkeeping (DB writes only). Separated from the send so a retry here never re-sends.
+      await step.run(`record-step-${currentStep.position}`, async () => {
+        if (sendResult.attempted && sendResult.channel === "EMAIL") {
+          await prisma.leadTimeline.create({
+            data: sendResult.success
+              ? {
+                  leadId: lead.id,
+                  type: "EMAIL_SENT",
+                  description: `Sent campaign email: "${sendResult.subject}"`,
+                  metadata: { subject: sendResult.subject, body: sendResult.body, campaignId: campaign.id, stepPosition: currentStep.position, messageId: sendResult.messageId },
+                }
+              : {
+                  leadId: lead.id,
+                  type: "EMAIL_FAILED",
+                  description: `Failed to send campaign email: ${sendResult.error}`,
+                  metadata: { subject: sendResult.subject, body: sendResult.body, error: sendResult.error, campaignId: campaign.id, stepPosition: currentStep.position },
+                },
+          });
+        } else if (sendResult.attempted && sendResult.channel === "SMS") {
+          await prisma.leadTimeline.create({
+            data: sendResult.success
+              ? {
+                  leadId: lead.id,
+                  type: "SMS_SENT",
+                  description: `Sent campaign SMS: "${sendResult.body.slice(0, 50)}${sendResult.body.length > 50 ? "..." : ""}"`,
+                  metadata: { body: sendResult.body, campaignId: campaign.id, stepPosition: currentStep.position },
+                }
+              : {
+                  leadId: lead.id,
+                  type: "SMS_FAILED",
+                  description: `Failed to send campaign SMS: ${sendResult.error}`,
+                  metadata: { body: sendResult.body, error: sendResult.error, campaignId: campaign.id, stepPosition: currentStep.position },
+                },
+          });
+        } else {
+          console.log(`[Nurture] Step ${currentStep.position}: no ${currentStep.type} contact channel on lead; nothing sent.`);
         }
 
         await prisma.campaignEnrollment.update({
@@ -248,7 +340,8 @@ export const runNurtureCampaign = inngest.createFunction(
     }
 
     // Finished all steps
-    await step.run("complete-campaign", async () => {
+    console.log(`[Nurture] All steps processed. Completing campaign.`);
+    await step.run(`complete-campaign-${campaignId}-${enrollment.id}`, async () => {
       await prisma.campaignEnrollment.update({
         where: { id: enrollment.id },
         data: { status: "COMPLETED" },
@@ -278,7 +371,7 @@ export const runNurtureCampaign = inngest.createFunction(
 
 // Exit function to handle DB updates when a campaign run is cancelled
 export const handleCampaignExit = inngest.createFunction(
-  { id: "handle-campaign-exit", event: "campaign.exit" },
+  { id: "handle-campaign-exit", triggers: [{ event: "campaign.exit" }] },
   async ({ event, step }) => {
     const { leadId, reason } = event.data;
 

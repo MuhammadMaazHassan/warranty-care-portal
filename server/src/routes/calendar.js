@@ -3,7 +3,9 @@ import { requireAuth } from "../middlewares/auth.js";
 import {
   getCalendarEvents,
   createCalendarEvent,
-  getCalendarSuggestions
+  getCalendarSuggestions,
+  updateCalendarEvent,
+  transitionCalendarEvent
 } from "../controllers/calendar.controller.js";
 
 const router = Router();
@@ -11,5 +13,7 @@ const router = Router();
 router.get("/", requireAuth, getCalendarEvents);
 router.post("/", requireAuth, createCalendarEvent);
 router.post("/suggestions", requireAuth, getCalendarSuggestions);
+router.patch("/:id/status", requireAuth, transitionCalendarEvent);
+router.patch("/:id", requireAuth, updateCalendarEvent);
 
 export default router;

@@ -2,6 +2,8 @@ import prisma from "../lib/prisma.js";
 
 // Map US State codes to standard IANA timezone identifiers
 const STATE_TIMEZONE_MAP = {
+  PK: "Asia/Karachi",
+  PAKISTAN: "Asia/Karachi",
   // Pacific
   CA: "America/Los_Angeles",
   NV: "America/Los_Angeles",
@@ -534,5 +536,294 @@ export class ComplianceService {
       return body;
     }
     return `${body}${suffix}`;
+  }
+
+  /**
+   * Normalize a contact value for storage/comparison: lowercased email, digits-only phone.
+   */
+  static normalizeContact(channel, value) {
+    if (!value) return "";
+    return channel === "EMAIL"
+      ? value.trim().toLowerCase()
+      : value.replace(/\D/g, "");
+  }
+
+  /**
+   * Lightweight suppression check by raw contact value (used by the unified send gate
+   * for recipients that aren't a known Lead, e.g. warranty ticket-status emails).
+   */
+  static async checkSuppression(companyId, channel, value) {
+    const normalizedValue = this.normalizeContact(channel, value);
+    if (!companyId || !normalizedValue) return { suppressed: false };
+
+    const match =
+      channel === "EMAIL"
+        ? await prisma.suppressionList.findFirst({
+            where: {
+              companyId,
+              value: { equals: normalizedValue, mode: "insensitive" },
+            },
+          })
+        : await prisma.suppressionList.findFirst({
+            // Phone numbers may be stored with/without a country-code prefix; match on the
+            // last 10 digits to stay consistent across E.164 and national formats.
+            where: { companyId, value: { contains: normalizedValue.slice(-10) } },
+          });
+
+    return match
+      ? { suppressed: true, reason: match.reason }
+      : { suppressed: false };
+  }
+
+  /**
+   * Map a raw provider event name (Brevo email/SMS event, Twilio status) to an internal
+   * category. Returns null for events we don't act on.
+   */
+  static mapEventCategory(rawEventType) {
+    const map = {
+      // Delivery
+      delivered: "DELIVERED",
+      delivery: "DELIVERED",
+      // Engagement (email)
+      opened: "OPENED",
+      unique_opened: "OPENED",
+      open: "OPENED",
+      click: "CLICKED",
+      clicks: "CLICKED",
+      proxy_open: "OPENED",
+      // Hard failures -> suppress (BOUNCE)
+      hard_bounce: "BOUNCED",
+      invalid_email: "BOUNCED",
+      blocked: "BOUNCED",
+      // Soft / transient failures -> log only
+      soft_bounce: "SOFT_BOUNCE",
+      deferred: "SOFT_BOUNCE",
+      // Spam complaints -> suppress (COMPLAINT)
+      spam: "COMPLAINED",
+      complaint: "COMPLAINED",
+      // Unsubscribes -> suppress (UNSUBSCRIBE)
+      unsubscribed: "UNSUBSCRIBED",
+      unsubscribe: "UNSUBSCRIBED",
+      // SMS / generic failures -> log only (no suppression by default)
+      failed: "FAILED",
+      undelivered: "FAILED",
+      // Ignored lifecycle events
+      sent: "IGNORE",
+      request: "IGNORE",
+      queued: "IGNORE",
+      sending: "IGNORE",
+      accepted: "IGNORE",
+    };
+    return map[(rawEventType || "").toLowerCase()] || null;
+  }
+
+  /**
+   * Add a contact to the suppression list, opt the matching leads out of the channel, and
+   * exit them from any active campaigns. Shared by the bounce/complaint/unsubscribe paths.
+   */
+  static async suppressAndOptOut({ companyId, channel, normalizedValue, reason, sourceLabel }) {
+    if (!companyId || !normalizedValue) return [];
+
+    await prisma.suppressionList.upsert({
+      where: { companyId_value: { companyId, value: normalizedValue } },
+      create: { companyId, value: normalizedValue, reason },
+      update: { reason },
+    });
+
+    const isEmail = channel === "EMAIL";
+    const where = isEmail
+      ? { companyId, email: normalizedValue }
+      : { companyId, phone: { contains: normalizedValue.slice(-10) } };
+
+    const leads = await prisma.lead.findMany({ where });
+
+    const exitReason =
+      reason === "COMPLAINT" ? "COMPLAINT" : reason === "BOUNCE" ? "BOUNCE" : "UNSUBSCRIBE";
+
+    for (const lead of leads) {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: {
+          ...(isEmail ? { emailOptIn: false } : { smsOptIn: false }),
+          consentSource: sourceLabel,
+          consentTimestamp: new Date(),
+          timeline: {
+            create: {
+              type: "CONSENT_CHANGE",
+              description: `Auto-suppressed (${reason}) from ${channel} via ${sourceLabel}.`,
+            },
+          },
+        },
+      });
+
+      const { inngest } = await import("../lib/inngest.js");
+      await inngest.send({
+        name: "campaign.exit",
+        data: { leadId: lead.id, reason: exitReason },
+      });
+    }
+
+    return leads;
+  }
+
+  /**
+   * Ingest a delivery/engagement/failure event from an ESP or SMS provider. Logs the event
+   * on the matching lead timeline(s) and auto-suppresses on hard bounce / complaint /
+   * unsubscribe. Returns { handled, category, leadsMatched }.
+   */
+  static async handleMessageEvent({
+    companyId,
+    channel,
+    provider,
+    contact,
+    rawEventType,
+    errorCode = null,
+    metadata = {},
+  }) {
+    let category = this.mapEventCategory(rawEventType);
+
+    // Provider-specific overrides keyed on error codes. Twilio 21610 = recipient replied STOP
+    // (opt-out); 30007 = carrier filtered as spam/violation.
+    if (channel === "SMS" && errorCode) {
+      const code = String(errorCode);
+      if (code === "21610") category = "UNSUBSCRIBED";
+      else if (code === "30007") category = "COMPLAINED";
+    }
+
+    if (!category || category === "IGNORE") {
+      return { handled: false, category: null, leadsMatched: 0 };
+    }
+
+    const normalizedValue = this.normalizeContact(channel, contact);
+    if (!normalizedValue) return { handled: false, category, leadsMatched: 0 };
+
+    const where =
+      channel === "EMAIL"
+        ? { companyId, email: normalizedValue }
+        : { companyId, phone: { contains: normalizedValue.slice(-10) } };
+    const leads = await prisma.lead.findMany({ where });
+
+    const typeMap = {
+      DELIVERED: channel === "EMAIL" ? "EMAIL_DELIVERED" : "SMS_DELIVERED",
+      OPENED: "EMAIL_OPENED",
+      CLICKED: "EMAIL_CLICKED",
+      SOFT_BOUNCE: channel === "EMAIL" ? "EMAIL_DEFERRED" : "SMS_DEFERRED",
+      BOUNCED: channel === "EMAIL" ? "EMAIL_BOUNCED" : "SMS_FAILED",
+      COMPLAINED: channel === "EMAIL" ? "EMAIL_COMPLAINED" : "SMS_COMPLAINED",
+      FAILED: channel === "EMAIL" ? "EMAIL_FAILED" : "SMS_FAILED",
+      UNSUBSCRIBED: channel === "EMAIL" ? "EMAIL_UNSUBSCRIBED" : "SMS_UNSUBSCRIBED",
+    };
+    const timelineType = typeMap[category] || "SYNC_UPDATE";
+
+    // Record the raw event on every matching lead timeline (powers deliverability analytics
+    // and the complaint-rate metric).
+    for (const lead of leads) {
+      await prisma.leadTimeline.create({
+        data: {
+          leadId: lead.id,
+          type: timelineType,
+          description: `${channel} ${category.toLowerCase()} event from ${provider}`,
+          metadata: { ...metadata, provider, channel, category, rawEventType, contact, errorCode },
+        },
+      });
+    }
+
+    // Suppression-triggering categories.
+    const sourceLabel = `${provider} ${rawEventType}${errorCode ? ` (${errorCode})` : ""}`;
+    if (category === "BOUNCED") {
+      await this.suppressAndOptOut({ companyId, channel, normalizedValue, reason: "BOUNCE", sourceLabel });
+    } else if (category === "COMPLAINED") {
+      await this.suppressAndOptOut({ companyId, channel, normalizedValue, reason: "COMPLAINT", sourceLabel });
+      // NFR-O-001: re-evaluate the rolling complaint rate after every new complaint.
+      await this.checkComplaintRate(companyId, channel);
+    } else if (category === "UNSUBSCRIBED") {
+      await this.suppressAndOptOut({ companyId, channel, normalizedValue, reason: "UNSUBSCRIBE", sourceLabel });
+    }
+
+    return { handled: true, category, leadsMatched: leads.length };
+  }
+
+  /**
+   * NFR-O-001 — Compute the rolling complaint rate (complaints / sent) for a company and
+   * raise an alert when it exceeds the configured threshold (default 0.1%). Tunable via
+   * COMPLAINT_RATE_THRESHOLD, COMPLAINT_RATE_WINDOW_HOURS, COMPLAINT_RATE_MIN_VOLUME.
+   */
+  static async checkComplaintRate(companyId, channel = "EMAIL") {
+    const windowHours = parseInt(process.env.COMPLAINT_RATE_WINDOW_HOURS || "24", 10);
+    const threshold = parseFloat(process.env.COMPLAINT_RATE_THRESHOLD || "0.001"); // 0.1%
+    const minVolume = parseInt(process.env.COMPLAINT_RATE_MIN_VOLUME || "100", 10);
+    const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+
+    const sentType = channel === "EMAIL" ? "EMAIL_SENT" : "SMS_SENT";
+    const complaintType = channel === "EMAIL" ? "EMAIL_COMPLAINED" : "SMS_COMPLAINED";
+
+    const [sentCount, complaintCount] = await Promise.all([
+      prisma.leadTimeline.count({
+        where: { lead: { companyId }, type: sentType, createdAt: { gte: since } },
+      }),
+      prisma.leadTimeline.count({
+        where: { lead: { companyId }, type: complaintType, createdAt: { gte: since } },
+      }),
+    ]);
+
+    const rate = sentCount > 0 ? complaintCount / sentCount : 0;
+
+    // Below the minimum volume a single complaint produces a misleadingly high rate, so hold
+    // the alert until there's enough signal.
+    if (sentCount < minVolume) {
+      return { alerted: false, rate, sentCount, complaintCount, reason: "below-min-volume" };
+    }
+
+    if (rate > threshold) {
+      console.error(
+        `[Compliance ALERT][NFR-O-001] Complaint rate ${(rate * 100).toFixed(3)}% exceeds ` +
+          `threshold ${(threshold * 100).toFixed(3)}% for company ${companyId} ` +
+          `(${complaintCount} complaints / ${sentCount} ${channel} sent in last ${windowHours}h).`
+      );
+      await this.sendComplaintRateAlert(companyId, {
+        rate,
+        threshold,
+        complaintCount,
+        sentCount,
+        windowHours,
+        channel,
+      });
+      return { alerted: true, rate, sentCount, complaintCount };
+    }
+
+    return { alerted: false, rate, sentCount, complaintCount };
+  }
+
+  /**
+   * Deliver the complaint-rate alert to an ops mailbox (COMPLIANCE_ALERT_EMAIL). No-op when
+   * unset, so the console.error above remains the baseline alert hook. Never throws.
+   */
+  static async sendComplaintRateAlert(companyId, metrics) {
+    const to = process.env.COMPLIANCE_ALERT_EMAIL;
+    if (!to) return;
+
+    try {
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const { MailService } = await import("./mail-service.js");
+      const ratePct = (metrics.rate * 100).toFixed(3);
+      const thresholdPct = (metrics.threshold * 100).toFixed(3);
+
+      await MailService.sendEmail({
+        to,
+        subject: `[ALERT] High ${metrics.channel} complaint rate (${ratePct}%) — ${company?.name || companyId}`,
+        html: `
+          <div style="font-family: sans-serif; line-height: 1.6;">
+            <h2 style="color: #b91c1c;">Complaint-rate threshold exceeded (NFR-O-001)</h2>
+            <p><strong>Company:</strong> ${company?.name || "(unknown)"} (${companyId})</p>
+            <p><strong>Channel:</strong> ${metrics.channel}</p>
+            <p><strong>Complaint rate:</strong> ${ratePct}% (threshold ${thresholdPct}%)</p>
+            <p><strong>Volume:</strong> ${metrics.complaintCount} complaints / ${metrics.sentCount} sent in the last ${metrics.windowHours}h</p>
+            <p>Review recent campaigns and sending lists. Affected contacts are auto-suppressed.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error("[Compliance] Failed to send complaint-rate alert email:", error?.message || error);
+    }
   }
 }

@@ -2,26 +2,23 @@ import { inngest } from "../../lib/inngest.js";
 import prisma from "../../lib/prisma.js";
 
 export const handleCsvImport = inngest.createFunction(
-  { id: "handle-csv-import", event: "csv/import.started" },
+  { id: "handle-csv-import", triggers: [{ event: "csv/import.started" }] },
   async ({ event, step }) => {
     const { rows, mergeStrategy, companyId, userId, userRole, userName } = event.data;
-    
+
     const chunkSize = 100;
-    let createdCount = 0;
-    let updatedCount = 0;
-    let skippedCount = 0;
-    const errors = [];
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const summary = await step.run("process-rows", async () => {
+      let createdCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const errors = [];
 
-    await step.run("process-rows", async () => {
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        
         for (let j = 0; j < chunk.length; j++) {
           const lead = chunk[j];
           const rowNum = i + j + 1;
-          
           const firstName = lead.firstName;
           const lastName = lead.lastName;
           const email = lead.email;
@@ -29,7 +26,7 @@ export const handleCsvImport = inngest.createFunction(
           const emailOptIn = Boolean(lead.emailOptIn);
           const smsOptIn = Boolean(lead.smsOptIn);
           const tags = Array.isArray(lead.tags) ? lead.tags : [];
-          
+
           if (!firstName || !lastName) {
             errors.push({ row: rowNum, reason: "First name and last name are required." });
             continue;
@@ -124,8 +121,17 @@ export const handleCsvImport = inngest.createFunction(
           createdCount++;
         }
       }
+
+      return { createdCount, updatedCount, skippedCount, errors };
     });
 
-    return { total: rows.length, createdCount, updatedCount, skippedCount, errorsCount: errors.length };
+    return {
+      total: rows.length,
+      createdCount: summary.createdCount,
+      updatedCount: summary.updatedCount,
+      skippedCount: summary.skippedCount,
+      errorsCount: summary.errors.length,
+      errors: summary.errors,
+    };
   }
 );

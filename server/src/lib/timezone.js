@@ -5,6 +5,7 @@
 
 // Basic US State to IANA Timezone mapping
 const STATE_TO_TZ = {
+  PK: "Asia/Karachi",
   AL: "America/Chicago",
   AK: "America/Anchorage",
   AZ: "America/Phoenix",

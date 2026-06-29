@@ -1,5 +1,77 @@
 import prisma from "../lib/prisma.js";
 import { GoogleGenAI } from "@google/genai";
+import { getNextValidSendWindow } from "../lib/timezone.js";
+
+// ─── Content Calendar lifecycle ───────────────────────────────────────────────
+// Suggested → Draft → Approved → Scheduled → Sent | Published → (Failed)
+// Dismissed is a terminal off-ramp available from the early states.
+
+const VALID_STATUSES = [
+  "Suggested",
+  "Draft",
+  "Approved",
+  "Scheduled",
+  "Sent",
+  "Published",
+  "Failed",
+  "Dismissed",
+];
+
+const STATUS_TRANSITIONS = {
+  Suggested: ["Draft", "Dismissed"],
+  Draft: ["Approved", "Dismissed"],
+  Approved: ["Scheduled", "Draft"],
+  Scheduled: ["Sent", "Published", "Failed", "Draft"],
+  Failed: ["Scheduled", "Draft"],
+  Sent: [],
+  Published: [],
+  Dismissed: [],
+};
+
+// Approval gate: only an ADMIN may move an item into these states.
+const APPROVAL_REQUIRED_TARGETS = new Set(["Approved"]);
+// Items in a terminal/sent state can no longer be edited or rescheduled.
+const NON_EDITABLE_STATUSES = new Set(["Sent", "Published", "Dismissed"]);
+const EDITABLE_FIELDS = ["title", "content", "subject", "reason", "outline", "channel"];
+
+// ─── SMS compliance window (TCPA quiet hours 8 AM–9 PM) ───────────────────────
+// ContentCalendar items are company-level (not tied to a single lead), so there
+// is no per-recipient timezone. We enforce the window against a configurable
+// default tz. Per-recipient quiet hours are still enforced at actual send time
+// by ComplianceService.
+const DEFAULT_TIMEZONE = process.env.DEFAULT_SEND_TIMEZONE || "America/New_York";
+const SMS_WINDOW_START_HOUR = 8; // 8 AM inclusive
+const SMS_WINDOW_END_HOUR = 21; // 9 PM exclusive
+
+function getHourInTz(date, tz) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour: "numeric",
+    hour12: false,
+  });
+  return parseInt(formatter.format(date), 10) % 24; // guard against "24" at midnight
+}
+
+function isWithinSmsWindow(date, tz) {
+  const hour = getHourInTz(date, tz);
+  return hour >= SMS_WINDOW_START_HOUR && hour < SMS_WINDOW_END_HOUR;
+}
+
+// Returns null if the date is sendable, otherwise an error payload with a suggested time.
+function checkSmsWindow(date) {
+  if (isWithinSmsWindow(date, DEFAULT_TIMEZONE)) return null;
+  const suggestedTime = getNextValidSendWindow(
+    date,
+    DEFAULT_TIMEZONE,
+    "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+    "08:00",
+    "21:00"
+  );
+  return {
+    message: `Scheduled time is outside the SMS sending window (8:00 AM–9:00 PM ${DEFAULT_TIMEZONE}). Pick a time within that window.`,
+    suggestedTime,
+  };
+}
 
 export const getCalendarEvents = async (req, res) => {
   try {
@@ -92,10 +164,28 @@ export const createCalendarEvent = async (req, res) => {
       return res.status(403).json({ message: "No company associated" });
     }
 
-    const { title, channel, scheduledAt, content, subject, reason, outline, isAiSuggested } = req.body;
+    const { title, channel, scheduledAt, content, subject, reason, outline, isAiSuggested, status } = req.body;
 
     if (!title || !channel || !scheduledAt || !content) {
       return res.status(400).json({ message: "Missing required fields: title, channel, scheduledAt, content" });
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    if (isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({ message: "Invalid scheduledAt date" });
+    }
+
+    // Lifecycle entry point: AI items land as "Suggested", manual items as "Draft".
+    // Callers may explicitly request another state (e.g. "Scheduled") via `status`.
+    const initialStatus = status || (isAiSuggested ? "Suggested" : "Draft");
+    if (!VALID_STATUSES.includes(initialStatus)) {
+      return res.status(400).json({ message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    }
+
+    // If created directly in a send-ready state, enforce the SMS quiet-hours window.
+    if (initialStatus === "Scheduled" && channel === "SMS") {
+      const windowError = checkSmsWindow(scheduledDate);
+      if (windowError) return res.status(422).json(windowError);
     }
 
     const event = await prisma.contentCalendar.create({
@@ -103,13 +193,13 @@ export const createCalendarEvent = async (req, res) => {
         companyId: req.user.companyId,
         title,
         channel,
-        scheduledAt: new Date(scheduledAt),
+        scheduledAt: scheduledDate,
         content,
         subject: subject || null,
         reason: reason || null,
         outline: outline || null,
         isAiSuggested: !!isAiSuggested,
-        status: "Scheduled",
+        status: initialStatus,
       },
     });
 
@@ -194,6 +284,117 @@ export const getCalendarSuggestions = async (req, res) => {
     return res.json(defaults);
   } catch (error) {
     console.error("[Calendar Suggestions] Error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// PATCH /api/sales/calendar/:id — reschedule (drag-and-drop) and/or edit content
+export const updateCalendarEvent = async (req, res) => {
+  try {
+    if (!req.user || !req.user.companyId) {
+      return res.status(403).json({ message: "No company associated" });
+    }
+
+    const { id } = req.params;
+    const item = await prisma.contentCalendar.findFirst({
+      where: { id, companyId: req.user.companyId },
+    });
+    if (!item) {
+      return res.status(404).json({ message: "Calendar item not found" });
+    }
+    if (NON_EDITABLE_STATUSES.has(item.status)) {
+      return res.status(409).json({ message: `Cannot edit an item in "${item.status}" state` });
+    }
+
+    const data = {};
+    for (const field of EDITABLE_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field];
+    }
+
+    // Reschedule: validate the new date and enforce compliance windows on it.
+    if (req.body.scheduledAt !== undefined) {
+      const newDate = new Date(req.body.scheduledAt);
+      if (isNaN(newDate.getTime())) {
+        return res.status(400).json({ message: "Invalid scheduledAt date" });
+      }
+      if (newDate.getTime() <= Date.now()) {
+        return res.status(422).json({ message: "Scheduled time must be in the future" });
+      }
+      const effectiveChannel = data.channel || item.channel;
+      if (effectiveChannel === "SMS") {
+        const windowError = checkSmsWindow(newDate);
+        if (windowError) return res.status(422).json(windowError);
+      }
+      data.scheduledAt = newDate;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    const updated = await prisma.contentCalendar.update({
+      where: { id: item.id },
+      data,
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("[Calendar Update] Error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// PATCH /api/sales/calendar/:id/status — move an item through its lifecycle
+export const transitionCalendarEvent = async (req, res) => {
+  try {
+    if (!req.user || !req.user.companyId) {
+      return res.status(403).json({ message: "No company associated" });
+    }
+
+    const { id } = req.params;
+    const { status: target } = req.body;
+
+    if (!target || !VALID_STATUSES.includes(target)) {
+      return res
+        .status(400)
+        .json({ message: `Invalid target status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    }
+
+    const item = await prisma.contentCalendar.findFirst({
+      where: { id, companyId: req.user.companyId },
+    });
+    if (!item) {
+      return res.status(404).json({ message: "Calendar item not found" });
+    }
+
+    if (item.status === target) {
+      return res.json(item); // no-op
+    }
+
+    const allowed = STATUS_TRANSITIONS[item.status] || [];
+    if (!allowed.includes(target)) {
+      return res.status(409).json({
+        message: `Invalid transition: "${item.status}" → "${target}". Allowed: ${allowed.join(", ") || "none"}`,
+      });
+    }
+
+    // Approval gate per tenant policy (default: ADMIN-only approval).
+    if (APPROVAL_REQUIRED_TARGETS.has(target) && req.user.role?.toUpperCase() !== "ADMIN") {
+      return res.status(403).json({ message: "Only an ADMIN can approve calendar items" });
+    }
+
+    // Moving into a send-ready state re-checks the SMS quiet-hours window.
+    if (target === "Scheduled" && item.channel === "SMS") {
+      const windowError = checkSmsWindow(item.scheduledAt);
+      if (windowError) return res.status(422).json(windowError);
+    }
+
+    const updated = await prisma.contentCalendar.update({
+      where: { id: item.id },
+      data: { status: target },
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("[Calendar Transition] Error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };

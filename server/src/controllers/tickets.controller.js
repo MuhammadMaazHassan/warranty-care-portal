@@ -1,7 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { calculateWarrantyYear } from "../lib/utils.js";
 import { generateTicketId } from "../lib/ticket-utils.js";
-import { MailService } from "../services/mail-service.js";
+import { MessagingService } from "../services/messaging-service.js";
 
 export const getTickets = async (req, res) => {
   try {
@@ -171,7 +171,15 @@ export const updateTicket = async (req, res) => {
       where: { id },
       include: { 
         homeowner: {
-          include: { company: true }
+          include: { 
+            company: {
+              include: {
+                integrations: {
+                  where: { platform: "BREVO_EMAIL" }
+                }
+              }
+            }
+          }
         } 
       }
     });
@@ -213,19 +221,39 @@ export const updateTicket = async (req, res) => {
     if (status && status !== oldTicket.status) {
       if (oldTicket.homeowner?.email) {
         try {
-          // Attempting to send an email, not failing the request if mail fails
-          if (MailService && typeof MailService.sendTicketStatusUpdate === 'function') {
-            const mailResult = await MailService.sendTicketStatusUpdate(
-              oldTicket.homeowner.email,
-              oldTicket.homeowner.name || "Homeowner",
-              ticket.id,
-              status,
-              oldTicket.homeowner.company
-            );
-            
-            if (!mailResult.success) {
-              console.error("[Ticket API] Mail failed to send but ticket updated:", mailResult.error);
+          // Extract SMTP config if available
+          let smtpConfig = null;
+          if (oldTicket.homeowner.company?.integrations) {
+            const emailInt = oldTicket.homeowner.company.integrations.find(i => i.platform === "BREVO_EMAIL" && i.isActive);
+            if (emailInt) {
+              smtpConfig = {
+                host: emailInt.smtpHost,
+                port: emailInt.smtpPort,
+                user: emailInt.apiKey,
+                pass: emailInt.secretKey,
+                senderEmail: emailInt.senderEmail,
+                senderName: emailInt.senderName,
+              };
             }
+          }
+
+          // Attempting to send an email, not failing the request if mail fails.
+          // Routed through MessagingService so suppressed (bounced/complained/unsubscribed)
+          // homeowners are not emailed.
+          const mailResult = await MessagingService.sendTicketStatusUpdate({
+            companyId: oldTicket.homeowner.companyId,
+            to: oldTicket.homeowner.email,
+            homeownerName: oldTicket.homeowner.name || "Homeowner",
+            ticketId: ticket.id,
+            status,
+            company: oldTicket.homeowner.company,
+            smtpConfig,
+          });
+
+          if (mailResult.blocked) {
+            console.warn(`[Ticket API] Status email suppressed for ${oldTicket.homeowner.email}: ${mailResult.reason}`);
+          } else if (!mailResult.success) {
+            console.error("[Ticket API] Mail failed to send but ticket updated:", mailResult.error);
           }
         } catch (mailError) {
           console.error("[Ticket API] Unexpected error sending status email:", mailError);
