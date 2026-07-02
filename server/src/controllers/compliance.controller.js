@@ -445,41 +445,39 @@ export const processBrevoEmailEvents = async (req, res) => {
   }
 };
 
-export const processBrevoSmsEvents = async (req, res) => {
+// Twilio delivery-status callback. Twilio POSTs one form-encoded event per request
+// (MessageStatus: queued | sending | sent | delivered | undelivered | failed).
+export const processTwilioSmsStatus = async (req, res) => {
   try {
     const companyId = req.query.companyId || req.body?.companyId;
     if (!companyId) {
       return res.status(400).json({ message: "companyId is required." });
     }
 
-    const raw = req.body;
-    const events = Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.items)
-        ? raw.items
-        : [raw];
-
-    let handled = 0;
-    for (const ev of events) {
-      const phone = ev.to || ev.recipient || ev.msisdn || ev.mobile;
-      const eventType = ev.event || ev.type || ev.status || "";
-      if (!phone || !eventType) continue;
-
-      const result = await ComplianceService.handleMessageEvent({
-        companyId,
-        channel: "SMS",
-        provider: "BREVO_SMS",
-        contact: phone,
-        rawEventType: eventType,
-        errorCode: ev.errorCode || ev.error_code || null,
-        metadata: { messageId: ev.messageId || ev["message-id"], reason: ev.reason, ts: ev.ts || ev.date, tag: ev.tag },
-      });
-      if (result.handled) handled++;
+    // For outbound status, the recipient is the `To` field.
+    const phone = req.body.To || req.body.to;
+    const status = req.body.MessageStatus || req.body.SmsStatus || req.body.status || "";
+    if (!phone || !status) {
+      return res.status(200).json({ success: true, handled: 0 });
     }
 
-    return res.json({ success: true, handled, total: events.length });
+    const result = await ComplianceService.handleMessageEvent({
+      companyId,
+      channel: "SMS",
+      provider: "TWILIO_SMS",
+      contact: phone,
+      rawEventType: status,
+      errorCode: req.body.ErrorCode || null,
+      metadata: {
+        messageId: req.body.MessageSid || req.body.SmsSid,
+        reason: req.body.ErrorMessage,
+        tag: req.query.tag || null,
+      },
+    });
+
+    return res.status(200).json({ success: true, handled: result.handled ? 1 : 0 });
   } catch (error) {
-    console.error("[Brevo SMS Events] Error:", error);
+    console.error("[Twilio SMS Status] Error:", error);
     return res.status(500).json({ message: error.message || "Internal server error" });
   }
 };
@@ -560,82 +558,88 @@ export const processBrevoInboundEmail = async (req, res) => {
   }
 };
 
-export const processBrevoInboundSms = async (req, res) => {
+// Escape a string for safe inclusion in TwiML (XML) responses.
+function escapeXml(str = "") {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+// Build a TwiML response. When `message` is provided, Twilio sends it back to the
+// sender as an SMS reply; otherwise an empty <Response/> acknowledges with no reply.
+function twiml(message) {
+  const inner = message ? `<Message>${escapeXml(message)}</Message>` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${inner}</Response>`;
+}
+
+// Twilio inbound-SMS webhook. Twilio POSTs one form-encoded message per request
+// (From, To, Body, MessageSid) and expects a TwiML (text/xml) response.
+export const processTwilioInboundSms = async (req, res) => {
+  const sendTwiml = (message) => res.status(200).type("text/xml").send(twiml(message));
+
   try {
     const companyId = req.query.companyId || req.body?.companyId;
-
     if (!companyId) {
       return res.status(400).json({ message: "companyId is required." });
     }
 
-    const raw = req.body;
-    const items = Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.items)
-        ? raw.items
-        : [raw];
+    const sender = req.body.From || req.body.from || req.body.sender;
+    const body = req.body.Body || req.body.body || req.body.text || "";
 
-    let processedCount = 0;
+    if (!sender || !body) {
+      console.warn("[Twilio SMS Webhook] Missing From/Body, skipping.");
+      return sendTwiml();
+    }
 
-    for (const item of items) {
-      const sender = item.from || item.From || item.sender;
-      const body = item.text || item.Text || item.body || item.Body || "";
+    const normalizedContact = sender.replace(/\D/g, "");
 
-      if (!sender || !body) {
-        console.warn("[Brevo SMS Webhook] Item is missing from/text, skipping.");
-        continue;
-      }
+    // 1. Handle compliance keywords (STOP, UNSUBSCRIBE, START, HELP, etc.)
+    const result = await ComplianceService.handleInboundKeyword(
+      companyId,
+      sender,
+      body,
+      "SMS"
+    );
 
-      const normalizedContact = sender.replace(/\D/g, "");
+    if (result.isComplianceAction) {
+      // Reply to the sender via TwiML (e.g. opt-out confirmation).
+      return sendTwiml(result.replyText);
+    }
 
-      // Check compliance keywords (STOP, UNSUBSCRIBE, etc.)
-      const result = await ComplianceService.handleInboundKeyword(
+    // 2. Log the reply on matching lead timelines and fan out to Inngest.
+    const leads = await prisma.lead.findMany({
+      where: {
         companyId,
-        sender,
-        body,
-        "SMS"
-      );
+        phone: { contains: normalizedContact.slice(-10) },
+      },
+    });
 
-      if (result.isComplianceAction) {
-        processedCount++;
-        continue; // Compliance action handled; move on
-      }
-
-      // Find matching leads
-      const leads = await prisma.lead.findMany({
-        where: {
-          companyId,
-          phone: { contains: normalizedContact.slice(-10) },
+    for (const lead of leads) {
+      await prisma.leadTimeline.create({
+        data: {
+          leadId: lead.id,
+          type: "REPLY_RECEIVED",
+          description: `Received inbound SMS reply: "${body.slice(0, 150)}${body.length > 150 ? "..." : ""}"`,
+          metadata: { body, channel: "SMS", sender },
         },
       });
 
-      for (const lead of leads) {
-        await prisma.leadTimeline.create({
-          data: {
-            leadId: lead.id,
-            type: "REPLY_RECEIVED",
-            description: `Received inbound SMS reply: "${body.slice(0, 150)}${body.length > 150 ? "..." : ""}"`,
-            metadata: { body, channel: "SMS", sender },
-          },
-        });
-
-        const { inngest } = await import("../lib/inngest.js");
-        await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "REPLY" } });
-        await inngest.send({
-          name: "lead.reply.received",
-          data: { leadId: lead.id, companyId, channel: "SMS", body, sender },
-        });
-      }
-
-      processedCount++;
+      const { inngest } = await import("../lib/inngest.js");
+      await inngest.send({ name: "campaign.exit", data: { leadId: lead.id, reason: "REPLY" } });
+      await inngest.send({
+        name: "lead.reply.received",
+        data: { leadId: lead.id, companyId, channel: "SMS", body, sender },
+      });
     }
 
-    return res.json({
-      success: true,
-      processedItems: processedCount,
-    });
+    // Acknowledge without an auto-reply (the scheduling agent handles any response).
+    return sendTwiml();
   } catch (error) {
-    console.error("[Brevo SMS Webhook] Error processing inbound SMS:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error("[Twilio SMS Webhook] Error processing inbound SMS:", error);
+    // Still return valid TwiML so Twilio doesn't retry indefinitely.
+    return res.status(200).type("text/xml").send(twiml());
   }
 };

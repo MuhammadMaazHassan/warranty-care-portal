@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requireRoles } from "../middlewares/auth.js";
 import { verifyWebhookSecret } from "../middlewares/webhook-auth.js";
+import { verifyTwilioSignature } from "../middlewares/twilio-auth.js";
 import {
   getSuppressions,
   addSuppression,
@@ -8,9 +9,9 @@ import {
   processInbound,
   unsubscribeWebhook,
   processBrevoInboundEmail,
-  processBrevoInboundSms,
+  processTwilioInboundSms,
   processBrevoEmailEvents,
-  processBrevoSmsEvents,
+  processTwilioSmsStatus,
 } from "../controllers/compliance.controller.js";
 
 const router = Router();
@@ -21,8 +22,8 @@ router.delete("/suppression", requireAuth, requireRoles(["ADMIN", "STAFF"]), del
 router.post("/inbound", verifyWebhookSecret, processInbound);
 router.post("/unsubscribe", verifyWebhookSecret, unsubscribeWebhook);
 router.post("/inbound/email", verifyWebhookSecret, processBrevoInboundEmail);
-router.post("/inbound/sms", verifyWebhookSecret, processBrevoInboundSms);
+router.post("/inbound/sms", verifyTwilioSignature, processTwilioInboundSms);
 router.post("/events/email", verifyWebhookSecret, processBrevoEmailEvents);
-router.post("/events/sms", verifyWebhookSecret, processBrevoSmsEvents);
+router.post("/events/sms", verifyTwilioSignature, processTwilioSmsStatus);
 
 export default router;

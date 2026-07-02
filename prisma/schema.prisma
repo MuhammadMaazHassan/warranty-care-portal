@@ -88,7 +88,8 @@ model Integration {
   id          String  @id @default(cuid())
   companyId   String
   company     Company @relation(fields: [companyId], references: [id])
-  platform    String // "BUILTOPIA", "BUILDERTREND", "BREVO_EMAIL", "BREVO_SMS"
+  platform    String // "BUILTOPIA", "BUILDERTREND", "BREVO_EMAIL", "TWILIO_SMS"
+  // For TWILIO_SMS: apiKey = Account SID, secretKey = Auth Token, senderName = From number (E.164) or Messaging Service SID.
   apiKey      String?
   secretKey   String?
   environment String  @default("production")

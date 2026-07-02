@@ -11,7 +11,7 @@ export const getMessagingSettings = async (req, res) => {
     const integrations = await prisma.integration.findMany({
       where: {
         companyId: session.companyId || "demo-company",
-        platform: { in: ["BREVO_EMAIL", "BREVO_SMS"] },
+        platform: { in: ["BREVO_EMAIL", "TWILIO_SMS"] },
       },
     });
 
@@ -34,12 +34,14 @@ export const getMessagingSettings = async (req, res) => {
       };
     }
 
-    const smsInt = integrations.find(i => i.platform === "BREVO_SMS");
+    const smsInt = integrations.find(i => i.platform === "TWILIO_SMS");
     if (smsInt) {
       settings.sms = {
         id: smsInt.id,
         provider: smsInt.platform,
+        // Twilio "from" number (E.164) or Messaging Service SID — not sensitive.
         senderName: smsInt.senderName,
+        // Account SID (apiKey) and Auth Token (secretKey) returned masked.
         apiKey: smsInt.apiKey ? `••••${smsInt.apiKey.slice(-4)}` : null,
         apiSecret: smsInt.secretKey ? `••••${smsInt.secretKey.slice(-4)}` : null,
         isActive: smsInt.isActive,
@@ -101,16 +103,16 @@ export const saveSmsSettings = async (req, res) => {
 
     const { provider, apiKey, apiSecret, senderName, isActive } = req.body;
     const companyId = session.companyId || "demo-company";
-    
-    if (provider !== "BREVO_SMS") {
+
+    if (provider !== "TWILIO_SMS") {
       return res.status(400).json({ message: "Invalid SMS provider" });
     }
 
-    // Delete any stale SMS integrations
+    // Delete any stale SMS integrations (including legacy Brevo SMS rows).
     await prisma.integration.deleteMany({
       where: {
         companyId,
-        platform: "BREVO_SMS",
+        platform: { in: ["TWILIO_SMS", "BREVO_SMS"] },
       },
     });
 
@@ -198,25 +200,26 @@ export const testSms = async (req, res) => {
     const { to, config } = req.body;
     if (!to) return res.status(400).json({ message: "Recipient phone number required" });
     
-    let smsConfig = config;
+    let smsConfig;
+    // If either credential is masked, pull the real values from the DB.
     if (config.apiKey?.includes("••••") || config.apiSecret?.includes("••••")) {
       const existing = await prisma.integration.findFirst({
-        where: { companyId: req.user?.companyId || "demo-company", platform: config.provider },
+        where: { companyId: req.user?.companyId || "demo-company", platform: "TWILIO_SMS" },
       });
       if (!existing) return res.status(400).json({ message: "SMS settings not found in database to test" });
-      
+
       smsConfig = {
-        provider: existing.platform,
-        apiKey: existing.apiKey,
-        apiSecret: existing.secretKey,
-        senderName: existing.senderName,
+        provider: "TWILIO_SMS",
+        accountSid: existing.apiKey,
+        authToken: existing.secretKey,
+        from: existing.senderName,
       };
     } else {
       smsConfig = {
-        provider: config.provider,
-        apiKey: config.apiKey,
-        apiSecret: config.apiSecret,
-        senderName: config.senderName,
+        provider: "TWILIO_SMS",
+        accountSid: config.apiKey,
+        authToken: config.apiSecret,
+        from: config.senderName,
       };
     }
 

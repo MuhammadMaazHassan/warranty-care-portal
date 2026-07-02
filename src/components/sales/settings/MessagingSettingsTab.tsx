@@ -28,10 +28,10 @@ export default function MessagingSettingsTab() {
   });
 
   const [smsConfig, setSmsConfig] = useState({
-    provider: "BREVO_SMS",
-    apiKey: "",
-    apiSecret: "",
-    senderName: "",
+    provider: "TWILIO_SMS",
+    apiKey: "", // Twilio Account SID
+    apiSecret: "", // Twilio Auth Token
+    senderName: "", // Twilio phone number (E.164) or Messaging Service SID
     testPhone: "",
   });
 
@@ -58,7 +58,7 @@ export default function MessagingSettingsTab() {
         if (data.sms) {
           setSmsConfig(prev => ({
             ...prev,
-            provider: data.sms.provider || "BREVO_SMS",
+            provider: data.sms.provider || "TWILIO_SMS",
             apiKey: data.sms.apiKey || "",
             apiSecret: data.sms.apiSecret || "",
             senderName: data.sms.senderName || "",
@@ -234,23 +234,28 @@ export default function MessagingSettingsTab() {
               </div>
               <CardTitle>SMS API Configuration</CardTitle>
             </div>
-            <CardDescription>Configure credentials for sending outbound SMS.</CardDescription>
+            <CardDescription>Configure Twilio credentials for sending and receiving SMS.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6 flex-1">
             <div className="space-y-2">
               <Label>SMS Provider</Label>
-              <Input value="Brevo" disabled className="bg-slate-50 dark:bg-slate-900/40" />
+              <Input value="Twilio" disabled className="bg-slate-50 dark:bg-slate-900/40" />
             </div>
 
             <div className="space-y-2">
-              <Label>API Key</Label>
-              <Input type="password" value={smsConfig.apiKey} onChange={e => setSmsConfig({...smsConfig, apiKey: e.target.value})} placeholder="••••••••" />
+              <Label>Account SID</Label>
+              <Input type="password" value={smsConfig.apiKey} onChange={e => setSmsConfig({...smsConfig, apiKey: e.target.value})} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
             </div>
 
             <div className="space-y-2">
-              <Label>Sender Name</Label>
-              <Input value={smsConfig.senderName} onChange={e => setSmsConfig({...smsConfig, senderName: e.target.value})} placeholder="YourCompany" />
-              <p className="text-xs text-slate-500">Alphanumeric sender ID, up to 11 characters.</p>
+              <Label>Auth Token</Label>
+              <Input type="password" value={smsConfig.apiSecret} onChange={e => setSmsConfig({...smsConfig, apiSecret: e.target.value})} placeholder="••••••••" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>From Number / Messaging Service SID</Label>
+              <Input value={smsConfig.senderName} onChange={e => setSmsConfig({...smsConfig, senderName: e.target.value})} placeholder="+15551234567 or MGxxxxxxxx" />
+              <p className="text-xs text-slate-500">A Twilio phone number in E.164 format, or a Messaging Service SID (starts with &quot;MG&quot;).</p>
             </div>
 
             <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">

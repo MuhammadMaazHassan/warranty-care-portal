@@ -499,6 +499,9 @@ export default function LeadsPage() {
                           </TableCell>
                           <TableCell className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 font-medium align-middle">{lead.owner?.name || "Unassigned"}</TableCell>
                           <TableCell className="py-3 px-4 text-right pr-6 space-x-1 align-middle">
+                            <Button variant="ghost" size="sm" onClick={() => openTimeline(lead)} className="text-slate-500 hover:bg-slate-500/10 text-xs px-2" title="View activity timeline">
+                              <Clock className="h-3.5 w-3.5" />
+                            </Button>
                             <Button variant="ghost" size="sm" onClick={() => setLeadToDelete(lead.id)} className="text-red-500 hover:bg-red-500/10 text-xs px-2">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
